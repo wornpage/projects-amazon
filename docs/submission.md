@@ -14,6 +14,6 @@ The customer need is a short, useful work briefing that ends with a clear owner 
 
 This application was independently created during the challenge window. It uses six fictional work items and does not connect to production Projects, Alexa+ preview services, or the Nebius challenge edition.
 
-**Current evidence:** the build and 32 automated tests pass, including an actual server restart and browser double-click confirmation. Automated conversation tests use a model fixture. The first actual Bedrock invocation was denied; successful live model behavior has not been established. This draft is not ready to claim a working live Bedrock demonstration.
+**Current evidence:** the build and 34 automated tests pass, including an actual server restart, browser double-click confirmation, reservation affordability, and retained out-of-limit usage. Automated conversation tests use a model fixture. The first actual Bedrock invocation was denied; successful live model behavior has not been established. This draft is not ready to claim a working live Bedrock demonstration.
 
 **Before submitting:** insert the reviewed GitHub repository URL, a public English demo video under three minutes, and the final observed validation result. Include the actual Bedrock integration and product feedback. Public publication, reviewer access and Devpost submission have not been performed by the local build.

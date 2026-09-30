@@ -20,12 +20,14 @@ Reviewed September 29, 2026, America/New_York. The approved scope is a local Ale
 | Persistence after restart and isolated sessions | A confirmed decision and conversation survive stopping one Node process and starting another; separate browser workspaces remain isolated | Verified locally |
 | Stubs only in tests; provider failures clearly unavailable | Test fixtures inject the model; production has no stub switch. Actual local preview shows inference paused | Verified locally |
 | One live batch, at most 20 attempts, bounded input, max 800 output tokens, no SDK retries | One retained batch, one denied attempt; persistent ledger and enforcement tests | Bounds verified; live journey incomplete |
-| Current pricing, $1 total test budget, receipts and stop on uncertain usage | Public price parser, reservations, persistent ledger; aws:check reads that same ledger | Verified locally; denied attempt usage unresolved |
+| Current pricing, $1 total test budget, receipts and stop on uncertain usage | Public price parser, full-context reservation affordability, retained out-of-limit usage, persistent ledger; aws:check reads that same ledger | Verified locally; denied attempt usage unresolved |
 | Setup, demo script, submission text, tool feedback, MIT public-source preparation | README, `docs/`, MIT license, pinned public dependencies and bundled notices | Prepared for review |
 
 ## Live gate
 
 The retained batch stopped after AccessDeniedException. No successful live conversation was produced. The original error receipt retained the provider request ID and code, but not its full explanation. New error receipts retain the bounded provider message and HTTP status. The original evidence remains unchanged.
+
+Future reservations use Nova Micro's documented 128K context ceiling, rounded conservatively to 131,072 input tokens, plus the pinned 800 output tokens. The full reservation must fit before dispatch. Reported usage beyond either ceiling is retained with its response request ID and stops further calls. Two new regression cases bring the local suite to 34 passing tests. The original failed reservation and usage pause remain intact. [Model limits](https://docs.aws.amazon.com/en_en/bedrock/latest/userguide/model-card-amazon-nova-micro.html).
 
 Read-only AWS checks found an active Free plan, no AWS organization membership, an authorized/available model, and a nonzero Nova Micro on-demand token quota. These checks do not establish runtime access or identify the denial's cause. There is no evidence here that upgrading the account or broadening IAM permissions would fix it. Account-specific diagnostics and a support draft are retained privately under ignored `data/`.
 

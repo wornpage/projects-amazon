@@ -7,6 +7,9 @@ export const AWS_PROFILE = 'projects-amazon';
 export const AWS_REGION = 'us-east-1';
 export const MODEL_ID = 'amazon.nova-micro-v1:0';
 export const PRICE_SOURCE = 'https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonBedrock/current/us-east-1/index.json';
+export const MODEL_LIMIT_SOURCE = 'https://docs.aws.amazon.com/en_en/bedrock/latest/userguide/model-card-amazon-nova-micro.html';
+const INPUT_TOKEN_CEILING = 128 * 1024;
+const OUTPUT_TOKEN_CEILING = 800;
 
 export async function fetchRates(fetcher = fetch) {
   const response = await fetcher(PRICE_SOURCE, { signal: AbortSignal.timeout(15000) });
@@ -51,17 +54,19 @@ export function createBedrockModel(store, { send, resolveCredentials, ratesFetch
     async converse(input) {
       const availability = await this.availability();
       if (!availability.available) throw new AppError(availability.code, availability.message, 503);
-      const request = { ...input, modelId: MODEL_ID, inferenceConfig: { maxTokens: 800, temperature: 0.2 } };
+      const request = { ...input, modelId: MODEL_ID, inferenceConfig: { maxTokens: OUTPUT_TOKEN_CEILING, temperature: 0.2 } };
       const bytes = Buffer.byteLength(JSON.stringify(request));
       if (bytes > 24000) throw new AppError('context_limit', 'This conversation exceeds the demo context limit. Start a new demo workspace.', 413);
       if (!rates || Date.now() - ratesAt > 3600000) { rates = await ratesFetcher(); ratesAt = Date.now(); }
-      // Byte bound plus framing allowance conservatively reserves token cost.
-      const reservation = (bytes + 4096) * rates.input.usdPerToken + 800 * rates.output.usdPerToken;
-      const id = store.reserveInference(reservation, { modelId: MODEL_ID, region: AWS_REGION, profile: AWS_PROFILE, requestBytes: bytes, pricing: rates });
+      // Reserve the documented full context window; request bytes do not prove token count.
+      const reservation = INPUT_TOKEN_CEILING * rates.input.usdPerToken + OUTPUT_TOKEN_CEILING * rates.output.usdPerToken;
+      const tokenCeiling = { input: INPUT_TOKEN_CEILING, output: OUTPUT_TOKEN_CEILING, source: MODEL_LIMIT_SOURCE };
+      const id = store.reserveInference(reservation, { modelId: MODEL_ID, region: AWS_REGION, profile: AWS_PROFILE, requestBytes: bytes, pricing: rates, tokenCeiling });
+      let response;
       try {
-        const response = await dispatch(request);
+        response = await dispatch(request);
         const usage = response.usage;
-        if (!usage || !Number.isSafeInteger(usage.inputTokens) || !Number.isSafeInteger(usage.outputTokens) || usage.inputTokens < 0 || usage.outputTokens < 0 || usage.outputTokens > 800) throw new AppError('usage_uncertain', 'The provider did not return usable token usage.', 503);
+        if (!usage || !Number.isSafeInteger(usage.inputTokens) || !Number.isSafeInteger(usage.outputTokens) || usage.inputTokens < 0 || usage.outputTokens < 0 || usage.inputTokens > INPUT_TOKEN_CEILING || usage.outputTokens > OUTPUT_TOKEN_CEILING) throw new AppError('usage_uncertain', 'The provider did not return usable token usage within the verified limits.', 503);
         const estimatedCostUsd = usage.inputTokens * rates.input.usdPerToken + usage.outputTokens * rates.output.usdPerToken;
         store.finishInference(id, estimatedCostUsd, { usage, providerRequestId: response.$metadata?.requestId ?? null, stopReason: response.stopReason });
         return response;
@@ -69,8 +74,9 @@ export function createBedrockModel(store, { send, resolveCredentials, ratesFetch
         store.uncertainInference(id, {
           errorCode: String(error.name ?? 'provider_error').replace(/[^a-zA-Z0-9_]/g, '').slice(0, 80),
           errorMessage: String(error.message ?? 'Provider request failed').slice(0, 1500),
-          httpStatusCode: error.$metadata?.httpStatusCode ?? null,
-          providerRequestId: error.$metadata?.requestId ?? null
+          httpStatusCode: response?.$metadata?.httpStatusCode ?? error.$metadata?.httpStatusCode ?? null,
+          providerRequestId: response?.$metadata?.requestId ?? error.$metadata?.requestId ?? null,
+          reportedUsage: response?.usage ?? null
         });
         if (error instanceof AppError) throw error;
         throw new AppError('provider_unavailable', 'Amazon Bedrock could not complete the request. The attempt receipt was retained; no automatic retry was made.', 503);

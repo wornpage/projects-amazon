@@ -32,7 +32,7 @@ This feedback reflects local development and one denied Bedrock invocation. Auto
 |---|---|---|---|---|
 | Complete CLI sign-in | A visible local prompt ready for the code | The background command prompt was separate from the app terminal; the first code expired | Important | Start a fresh sign-in, transfer the code promptly, and show the actual waiting process |
 | Validate Nova Micro | Authorized/available metadata leads to a successful bounded invocation | First Converse request was denied; quota metadata did not explain why | Critical for this demo | Retain the request ID, halt inference, and investigate account-specific access before retrying |
-| Estimate tokens before inference | Free CountTokens can estimate this model's input | Nova Micro returned that it does not support token counting | Important | Use a bounded request and conservative cost reservation; advertise model support clearly |
+| Estimate tokens before inference | Free CountTokens can estimate this model's input | Nova Micro returned that it does not support token counting | Important | Reserve the full documented context ceiling plus the pinned output cap until usage is returned; advertise model support clearly |
 | Recheck the app after a failed attempt | Preflight reports the persisted pause | Original aws:check used a fresh ledger | Important | Corrected to read the live SQLite ledger; regression tests cover the pause |
 | Diagnose the account restriction | Identify the denied request's cause and any usage | Basic Support's generated response could not recommend a remedy; an account case was created and awaits an agent | Critical for this demo | Preserve the failed attempt and pause inference pending the support investigation |
 
