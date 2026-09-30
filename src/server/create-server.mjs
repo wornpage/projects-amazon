@@ -47,7 +47,7 @@ export async function startServer({ port = 4317, databasePath = resolve('data/br
     req.demoSession = sessionId;
     next();
   });
-  const snapshot = async sessionId => ({ ...store.briefing(sessionId), proposals: store.proposals(sessionId), history: store.history(sessionId), messages: store.messages(sessionId), model: await model.availability(), budget: store.budget() });
+  const snapshot = async sessionId => ({ ...store.briefing(sessionId), proposals: store.proposals(sessionId), history: store.history(sessionId), messages: store.messages(sessionId), model: await conversation.availability(), budget: store.budget() });
   app.get('/api/workspace', async (req, res) => res.json(await snapshot(req.demoSession)));
   app.post('/api/chat', async (req, res) => {
     const input = parseInput(chatSchema, req.body);

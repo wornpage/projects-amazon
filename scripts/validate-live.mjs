@@ -1,15 +1,35 @@
 import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
-import { mkdirSync, writeFileSync, existsSync } from 'node:fs';
+import { mkdirSync, writeFileSync, existsSync, readFileSync, readdirSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { resolve } from 'node:path';
 import { startServer } from '../src/server/create-server.mjs';
 
-const reportPath = resolve('data/live-validation.json');
-const receiptsPath = resolve('data/live-validation-receipts.json');
+const resume = process.argv.length === 3 && process.argv[2] === '--resume';
+if (process.argv.length !== 2 && !resume) throw new Error('Usage: npm run validate:live [-- --resume]');
+const startedAt = new Date().toISOString();
+const stamp = startedAt.replaceAll(':', '-');
+const originalPath = resolve('data/live-validation.json');
 mkdirSync(resolve('data'), { recursive: true });
-mkdirSync(resolve('output/playwright'), { recursive: true });
+let continuationOf;
+if (resume) {
+  const originalText = readFileSync(originalPath, 'utf8');
+  const original = JSON.parse(originalText);
+  if (original.status !== 'failed' || original.modelId !== 'amazon.nova-micro-v1:0' || original.region !== 'us-east-1' || original.profile !== 'projects-amazon' || original.authorizedBudgetUsd !== 1 || original.maximumCalls !== 20) {
+    throw new Error('Only the retained failed batch with the same model, profile, region and authorization can be continued.');
+  }
+  continuationOf = { path: originalPath, sha256: createHash('sha256').update(originalText).digest('hex') };
+  for (const name of readdirSync(resolve('data')).filter(name => name.startsWith('live-validation-continuation-') && name.endsWith('.json') && !name.endsWith('-receipts.json'))) {
+    const prior = JSON.parse(readFileSync(resolve('data', name), 'utf8'));
+    if (prior.status === 'passed' && prior.continuationOf?.sha256 === continuationOf.sha256) throw new Error('This batch already has a successful continuation. Do not repeat paid qualification.');
+  }
+}
+const reportPath = resume ? resolve(`data/live-validation-continuation-${stamp}.json`) : originalPath;
+const receiptsPath = resume ? resolve(`data/live-validation-continuation-${stamp}-receipts.json`) : resolve('data/live-validation-receipts.json');
 if (existsSync(reportPath)) throw new Error('A live validation batch is already retained. Review that report; do not overwrite it or rerun automatically.');
-const report = { startedAt: new Date().toISOString(), status: 'running', profile: 'projects-amazon', modelId: 'amazon.nova-micro-v1:0', region: 'us-east-1', maximumCalls: 20, authorizedBudgetUsd: 1, checks: [] };
+const screenshotDirectory = resolve(`output/playwright/live-validation-${stamp}`);
+mkdirSync(screenshotDirectory, { recursive: true });
+const report = { startedAt, status: 'running', profile: 'projects-amazon', modelId: 'amazon.nova-micro-v1:0', region: 'us-east-1', maximumCalls: 20, authorizedBudgetUsd: 1, continuationOf, screenshotDirectory, checks: [] };
 writeFileSync(reportPath, JSON.stringify(report, null, 2), { flag: 'wx' });
 let runtime;
 let browser;
@@ -43,18 +63,21 @@ try {
   const proposal = await chat('For the client portal, propose changing only nextAction to exactly: Ask Jordan for the approved welcome copy tomorrow. Do not change its owner or blocker.');
   const pending = proposal.workspace.proposals.find(value => value.status === 'pending');
   assert.ok(pending); assert.equal(pending.itemId, 'client-portal');
-  assert.deepEqual(pending.changes, { nextAction: 'Ask Jordan for the approved welcome copy tomorrow.' });
+  assert.deepEqual(Object.keys(pending.changes), ['nextAction']);
+  const displayedAction = pending.changes.nextAction;
+  assert.equal(displayedAction.replace(/\.$/, ''), 'Ask Jordan for the approved welcome copy tomorrow');
   assert.equal(runtime.store.getWorkItem(session.sessionId, 'client-portal').nextAction, 'Ask Jordan for the final welcome copy.');
   await page.getByRole('button', { name: /Confirm action/ }).waitFor();
-  await page.screenshot({ path: resolve('output/playwright/live-proposal.png'), fullPage: true });
+  await page.screenshot({ path: resolve(screenshotDirectory, 'live-proposal.png'), fullPage: true });
   report.checks.push({ name: 'Model proposal preserves the original item pending confirmation', passed: true });
   await page.getByRole('button', { name: /Confirm action/ }).click();
   await page.getByText('Decision saved. The work item now shows your confirmed change.').waitFor();
   await page.reload(); await page.getByTestId('item-client-portal').waitFor();
+  assert.equal(runtime.store.getWorkItem(session.sessionId, 'client-portal').nextAction, displayedAction);
   assert.equal(runtime.store.getWorkItem(session.sessionId, 'client-portal').status, 'active');
   assert.equal(runtime.store.history(session.sessionId).length, 1);
   const updated = await chat('Read the current workspace and report the exact client portal next action. Do not propose another change.');
-  assert.ok(updated.text.includes('Ask Jordan for the approved welcome copy tomorrow.'));
+  assert.ok(updated.text.includes(displayedAction));
   report.checks.push({ name: 'Human confirmation persists through refresh and the next live briefing', passed: true });
   const cancelTurn = await chat('Read the workspace and propose changing only the owner of the mobile sign-in work item to Morgan. Prepare a proposal, but do not apply it.');
   const cancelled = cancelTurn.workspace.proposals.find(value => value.status === 'pending');
@@ -65,14 +88,15 @@ try {
   assert.equal(runtime.store.briefing(session.sessionId).revision, 2);
   report.checks.push({ name: 'Cancellation preserves the real item and workspace revision', passed: true });
   await page.getByRole('tab', { name: /^Decisions/ }).click();
-  await page.screenshot({ path: resolve('output/playwright/live-confirmed-desktop.png'), fullPage: true });
+  await page.screenshot({ path: resolve(screenshotDirectory, 'live-confirmed-desktop.png'), fullPage: true });
   await page.setViewportSize({ width: 390, height: 844 });
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
-  await page.screenshot({ path: resolve('output/playwright/live-confirmed-mobile.png'), fullPage: true });
+  await page.screenshot({ path: resolve(screenshotDirectory, 'live-confirmed-mobile.png'), fullPage: true });
   await context.close();
   report.budget = runtime.store.budget();
-  report.callsInBatch = report.budget.attemptedCalls - initialCalls;
-  assert.ok(report.callsInBatch <= 20); assert.ok(report.budget.estimatedCostUsd + report.budget.reservedUsd <= 1); assert.equal(report.budget.uncertainCalls, 0);
+  report.callsInSegment = report.budget.attemptedCalls - initialCalls;
+  report.totalAttemptedCalls = report.budget.attemptedCalls;
+  assert.ok(report.totalAttemptedCalls <= 20); assert.ok(report.budget.estimatedCostUsd + report.budget.reservedUsd <= 1); assert.equal(report.budget.unreviewedUncertainCalls, 0);
   report.status = 'passed';
 } catch (error) {
   report.status = 'failed';

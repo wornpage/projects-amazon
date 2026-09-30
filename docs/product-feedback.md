@@ -1,39 +1,44 @@
 # Product feedback — observed draft
 
-This feedback reflects local development and one denied Bedrock invocation. Automated model fixtures establish workflow behavior, not model reliability.
+This feedback reflects local development and a retained live batch of 19 Bedrock attempts: one denial and 18 responses with usable token counts. The main briefing/confirmation journey passed. The separate owner-change example needed an explicit correction before a proposal card existed. Automated fixtures establish application behavior, not model reliability.
 
-| Tool, API or SDK | Use and onboarding | What worked | What needs work | Use again? |
+| Tool, API or SDK | Use | What worked | Friction and recommendation | Use again? |
 |---|---|---|---|---|
-| Amazon challenge documentation | Select Alexa+ and AWS Builder; read requirements and FAQ | The FAQ clearly permits our own simulator and a locally runnable repository | Preview-only Alexa+ setup links can appear usable by entrants; put the eligibility explanation beside each link | Yes; use the FAQ alongside the track guide |
-| AWS CLI temporary sign-in | Authenticate the dedicated projects-amazon profile through the console | A fresh sign-in and immediate code transfer completed temporary authentication | The original code expired while its CLI prompt was in a background command session. Show which local process is waiting for a code | Yes; keep the prompt visible |
-| Amazon Bedrock / Nova Micro | Conversational runtime and client-side tool use through Converse | The model and regional metadata are discoverable; the public price list is readable | First invocation returned AccessDeniedException despite authorized/available metadata and a nonzero token quota. Model reliability remains unverified | Conditional on resolving runtime access |
-| AWS SDK for JavaScript v3 | Sign requests using the named profile; send Converse with maxTokens 800 and maxAttempts 1 | Configuration and typed command interfaces fit a small Node server; failures expose request metadata | Retain the provider message and HTTP status, not just the exception name. Our original receipt omitted the full explanation | Yes; keep bounded calls and diagnostic receipts |
-| AWS Free Tier and Service Quotas APIs | Read account plan and model quota without inference | Confirmed the account plan and a nonzero token quota | Neither check explains the denied runtime request or proves inference is available | Yes for diagnostics, alongside runtime evidence |
-| AWS Basic Support | Send the approved request-ID diagnostic and open a free account-access case | The Account / Other Account Issues path accepted a web case without a paid support upgrade | The generated response gave no recommendation; the case is awaiting an agent. No denial reason or usage confirmation is available yet | Yes for account-specific investigation; outcome pending |
-| AWS public price list | Verify regional Nova Micro token rates before dispatch | Supplies current input/output rates and effective dates for retained reservations | Nova Micro rejected the free CountTokens operation, so an exact token preflight was unavailable | Yes; retain conservative cost reservations |
-| MCP TypeScript SDK 1.31.0 | Real Streamable HTTP server and client; setup from SDK exports | Required protocol, discovery, reads, proposals, and version negotiation work in tests | Unknown tools return an error result; our first negative test incorrectly expected an exception. Highlight this shape in examples | Yes |
-| Wornpage Components | Install immutable public release archives and import Svelte entries | Shared buttons, fields, tabs, disclosures, alerts and ChangePreview cover the workflow; keyboard checks pass | Button's archive omits its license file; we included the canonical MIT notice. ChangePreview's one-change count has a minor grammar issue | Yes |
-| Svelte 5 and Vite | Typed conversation interface and local/production builds | Reactive work state and bundled component entries work together; desktop/mobile tests pass | Accessibility still needs application-level review of tab panels, labels and confirmation behavior | Yes |
-| Node 24 and SQLite | Local server, per-session work data, proposals and history | Real process-restart tests preserve decisions and conversation; WAL permits a read-only budget preflight | A persisted uncertainty must remain visible in every preflight; our original aws:check used an empty in-memory ledger and was corrected | Yes |
-| Express and Zod | HTTP routes and strict input validation | Malformed changes, invalid revisions, unauthorized origins and hidden confirmation tools fail without item mutation | Carefully keep browser confirmation and MCP permissions separate; frameworks do not establish that boundary automatically | Yes |
-| Playwright | Automated browser journeys and screenshots | Real clicks, keyboard controls, refresh, double clicks and restarted servers are testable | A model fixture cannot prove provider behavior. Keep fixture screenshots and live evidence clearly identified | Yes |
-| Fontsource | Bundle DM Sans and Manrope locally | The interface requests no external font assets | Preserve the fonts' OFL notices with the built assets | Yes |
-| Codex | Draft implementation, tests, setup and challenge materials | Helped build the independent app and inspect the confirmation boundary | Human review and actual provider validation remain necessary; a green local suite does not prove a working live model | Yes, with evidence-based review |
+| Amazon challenge documentation | Select Alexa+ and AWS Builder | FAQ permits a simulator and local repository | Put partner-preview eligibility beside every setup link | Yes |
+| AWS CLI temporary sign-in | Dedicated projects-amazon profile | Temporary console sign-in completed | Background prompt initially hid where to paste the code; persist profile region for later SDK refresh | Yes; show the waiting prompt |
+| Bedrock / Nova Micro | Converse and client-side tool use | Actual briefing, proposal, confirmed-state read and corrected owner proposal succeeded | Metadata said authorized/available before an invocation was denied. Later owner requests twice described a proposal without calling its tool | Yes, with bounded evaluation and human confirmation |
+| AWS SDK for JavaScript v3 | Named profile, maxTokens 800, maxAttempts 1 | Successful calls returned token counts and request IDs | Retain full bounded error messages and HTTP status. Our first denied receipt omitted the explanation | Yes |
+| AWS account and quota APIs | Read plan, organization and token quota | Useful read-only account facts | These checks do not prove runtime access or explain a particular denial | Yes, alongside actual invocation evidence |
+| AWS Basic Support | Approved free account-access case | Case creation required no paid support upgrade | Generated response gave no recommendation; case still awaited an agent at last review | Outcome pending |
+| AWS public price list | Verify regional rates | Current rates, effective dates and response hash support retained reservations | Nova Micro rejected CountTokens. Reserve the documented context bound when exact preflight counting is unavailable | Yes |
+| MCP TypeScript SDK 1.31.0 | Streamable HTTP server/client | Three tools, discovery and version negotiation work locally and with actual Bedrock | Unknown tools return an error result, not necessarily an exception; highlight this in examples | Yes |
+| Wornpage Components | Public immutable Svelte packages | Buttons, fields, tabs, disclosures, alerts and ChangePreview cover the workflow; keyboard checks pass | Button archive omits its license; canonical notice is bundled here. One-change count has a grammar issue | Yes |
+| Svelte 5 / Vite | Typed conversation and production build | Reactive state and public component entries work on desktop/mobile | The application must still verify labels, tab panels and confirmation behavior | Yes |
+| Node 24 / SQLite | Local state, proposals and history | Actual server restarts preserve data; WAL supports read-only preflight | Read the same persistent budget on every entry path; never substitute an empty ledger | Yes |
+| Express / Zod | HTTP and strict inputs | Invalid changes, stale revisions and unauthorized origins fail without mutation | Browser confirmation and MCP credentials need an explicit application boundary | Yes |
+| Playwright | Real browser verification | Clicks, refresh, cancellation, repeated confirmation and screenshots are testable | A fixture cannot prove provider behavior; retain live failures separately | Yes |
+| Fontsource | Bundle DM Sans / Manrope | No external font requests | Keep OFL notices with assets | Yes |
+| Codex | Independent implementation and review | Helped build, test and inspect the app and preserve diagnostic evidence | Human review and actual-provider checks remain necessary; passing local tests alone is insufficient | Yes |
 
-## Feature request
+## Concrete friction and changes
 
-**Important:** provide a self-service Alexa+ MCP testing path outside gated preview access, with a stateful decision example and a separate human-confirmation channel.
+**Credential refresh:** a missing region in the dedicated profile caused the SDK's temporary-login refresh to fail. Persisting `us-east-1` fixed that refresh. The subsequent Converse diagnostic succeeded. This does not prove that missing region caused the earlier AccessDenied response; that cause and actual billed usage remain unknown.
 
-**Important:** make Bedrock readiness checks distinguish model metadata availability from an account's ability to invoke the model, and return a specific remediation for account restrictions.
+**Budget recovery:** the original denied receipt lacked usable usage. We retained it as uncertain and reviewed a conservative $0.03 hold based on the full documented context in both directions at the higher historical/current rates. That established affordable remaining cost without erasing the failure, assuming zero cost or increasing the authorization. A new unreviewed failure still pauses inference.
 
-## Friction log
+**Tool sequencing:** a real turn attempted a proposal before a fresh read. Forcing get_briefing with toolChoice at each turn solved that sequence problem while preserving the server's revision guard. Temperature is now zero, following Nova's tool-calling guidance. [Tool calling guidance](https://docs.aws.amazon.com/nova/latest/userguide/prompting-tools-function.html).
 
-| Task | Expected | Observed | Severity | Workaround or suggestion |
-|---|---|---|---|---|
-| Complete CLI sign-in | A visible local prompt ready for the code | The background command prompt was separate from the app terminal; the first code expired | Important | Start a fresh sign-in, transfer the code promptly, and show the actual waiting process |
-| Validate Nova Micro | Authorized/available metadata leads to a successful bounded invocation | First Converse request was denied; quota metadata did not explain why | Critical for this demo | Retain the request ID, halt inference, and investigate account-specific access before retrying |
-| Estimate tokens before inference | Free CountTokens can estimate this model's input | Nova Micro returned that it does not support token counting | Important | Reserve the full documented context ceiling plus the pinned output cap until usage is returned; advertise model support clearly |
-| Recheck the app after a failed attempt | Preflight reports the persisted pause | Original aws:check used a fresh ledger | Important | Corrected to read the live SQLite ledger; regression tests cover the pause |
-| Diagnose the account restriction | Identify the denied request's cause and any usage | Basic Support's generated response could not recommend a remedy; an account case was created and awaits an agent | Critical for this demo | Preserve the failed attempt and pause inference pending the support investigation |
+**Prose versus tools:** two owner-change requests produced prose describing a proposal, including an invitation to confirm, but no tool call and no card. An explicit correction naming propose_next_action created the card. The successful cancellation then left work and revision unchanged. The displayed card and persisted history provide the operational evidence; narrative alone does not. Further tool-selection and concise-response evaluation is needed before broader use.
 
-[AWS documents CountTokens as free](https://docs.aws.amazon.com/bedrock/latest/userguide/count-tokens.html). The original provider attempt and diagnostic responses remain retained; no additional inference was made while preparing this feedback.
+**Response presentation:** Nova sometimes emits planning tags, Markdown markers and internal identifiers in its text. The app currently displays plain text. The result can be verbose; the separate Wornpage proposal card remains clearer. This needs refinement beyond the bounded validation batch.
+
+**Validation assumptions:** a correct live next-action proposal omitted one terminal period. The harness now checks intended wording and separately asserts that confirmation stores the exact displayed text, rather than treating prompt punctuation as evidence of a storage defect. The failed check is retained.
+
+## Feature requests
+
+- Provide a self-service Alexa+ MCP testing path outside gated preview access, with a stateful decision example and separate human confirmation.
+- Distinguish model metadata availability from account runtime access, and return request-specific remediation for denials.
+- Document model-specific CountTokens support beside each model card and show a supported budget-reservation alternative.
+- Include examples that validate actual tool results before presenting a proposed action as ready, including repeated conversation turns and browser decisions between them.
+
+[CountTokens is documented as free](https://docs.aws.amazon.com/bedrock/latest/userguide/count-tokens.html); the retained response from this model stated it was unsupported. The original diagnostic, provider failures, successful usage and screenshots remain private local evidence, outside the public-source archive.

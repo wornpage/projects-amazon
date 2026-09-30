@@ -1,35 +1,52 @@
-import { BedrockRuntimeClient, CountTokensCommand } from '@aws-sdk/client-bedrock-runtime';
-import { fromIni } from '@aws-sdk/credential-providers';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { AWS_PROFILE, AWS_REGION, MODEL_ID } from '../src/server/model.mjs';
+import { createHash } from 'node:crypto';
+import { fromIni } from '@aws-sdk/credential-providers';
+import { createStore } from '../src/server/store.mjs';
+import { createBedrockModel, fetchRates, AWS_PROFILE, AWS_REGION, MODEL_ID } from '../src/server/model.mjs';
 
-// AWS documents CountTokens as free. This diagnostic never invokes a model.
-const client = new BedrockRuntimeClient({
-  region: AWS_REGION, credentials: fromIni({ profile: AWS_PROFILE }), maxAttempts: 1
-});
-const receipt = {
-  checkedAt: new Date().toISOString(), operation: 'CountTokens',
-  profile: AWS_PROFILE, region: AWS_REGION, modelId: MODEL_ID,
-  inferenceCallsMade: 0,
-  pricingSource: 'https://docs.aws.amazon.com/bedrock/latest/userguide/count-tokens.html'
-};
+if (process.argv.length !== 4 || process.argv[2] !== '--review-denial') {
+  throw new Error('Usage: node scripts/diagnose-aws.mjs --review-denial <retained-receipt-id>. Stop the app first. This reviews one denial and can make ONE charged Converse call within the existing ledger.');
+}
+mkdirSync(resolve('data'), { recursive: true });
+const report = { startedAt: new Date().toISOString(), status: 'preflight', profile: AWS_PROFILE,
+  region: AWS_REGION, modelId: MODEL_ID, reviewedReceiptId: process.argv[3], maximumNewCalls: 1,
+  originalBatch: 'data/live-validation.json', maximumTotalCalls: 20, authorizedBudgetUsd: 1 };
+report.originalBatchSha256 = createHash('sha256').update(readFileSync(resolve(report.originalBatch))).digest('hex');
+const path = resolve(`data/access-diagnostic-${report.startedAt.replaceAll(':', '-')}.json`);
+writeFileSync(path, JSON.stringify(report, null, 2), { flag: 'wx' });
+let store;
+let model;
+let initialCalls;
 try {
-  const result = await client.send(new CountTokensCommand({
-    modelId: MODEL_ID,
-    input: { converse: { messages: [{ role: 'user', content: [{ text: 'Hello' }] }] } }
-  }), { abortSignal: AbortSignal.timeout(30000) });
-  Object.assign(receipt, { status: 'success', inputTokens: result.inputTokens,
-    providerRequestId: result.$metadata?.requestId, httpStatusCode: result.$metadata?.httpStatusCode });
+  store = createStore(resolve('data/briefing.sqlite'));
+  initialCalls = store.budget().attemptedCalls;
+  report.startingCalls = initialCalls;
+  const credentials = fromIni({ profile: AWS_PROFILE });
+  await credentials();
+  const pricing = await fetchRates();
+  report.costReview = store.reviewInferenceDenial(process.argv[3], pricing,
+    'Owner-requested review of the blocked diagnostic. Retain the denied attempt and reserve the full documented context in both directions at the higher historical/current rates, rounded up to a cent. Actual usage remains unknown.');
+  model = createBedrockModel(store, { resolveCredentials: credentials });
+  const response = await model.converse({ messages: [{ role: 'user', content: [{ text: 'Reply with OK.' }] }] });
+  report.status = 'passed';
+  report.usage = response.usage;
+  report.text = response.output?.message?.content?.filter(block => block.text).map(block => block.text).join('\n').slice(0, 2000);
 } catch (error) {
-  Object.assign(receipt, { status: 'failed', errorCode: error.name,
-    errorMessage: String(error.message).slice(0, 1500),
-    providerRequestId: error.$metadata?.requestId, httpStatusCode: error.$metadata?.httpStatusCode });
-  process.exitCode = 2;
+  report.status = 'failed';
+  report.failure = { code: error.code ?? error.name, message: String(error.message).slice(0, 1500) };
+  process.exitCode = 1;
 } finally {
-  client.destroy();
-  mkdirSync(resolve('data'), { recursive: true });
-  const path = resolve('data', `aws-diagnostic-${receipt.checkedAt.replace(/[:.]/g, '-')}.json`);
-  writeFileSync(path, JSON.stringify(receipt, null, 2) + '\n', { flag: 'wx' });
-  console.log(JSON.stringify({ ...receipt, receiptPath: path }, null, 2));
+  try {
+    if (store && initialCalls !== undefined) {
+      report.budget = store.budget();
+      report.newCalls = report.budget.attemptedCalls - initialCalls;
+      report.newReceipts = store.receipts().slice(initialCalls);
+    }
+  } catch (error) { report.auditFailure = String(error.message).slice(0, 1500); process.exitCode = 1; }
+  report.finishedAt = new Date().toISOString();
+  try { writeFileSync(path, JSON.stringify(report, null, 2)); }
+  finally { model?.close(); store?.close(); }
+  console.log(JSON.stringify({ path, status: report.status, failure: report.failure, newCalls: report.newCalls,
+    budget: report.budget, providerError: report.newReceipts?.at(-1)?.errorMessage }, null, 2));
 }

@@ -1,40 +1,72 @@
 # Implementation and verification audit
 
-Reviewed September 29, 2026, America/New_York. The approved scope is a local Alexa+ simulation with an actual Bedrock integration, three MCP tools, and human-confirmed work decisions. Repository publication, a public video, and Devpost submission follow owner review.
+Reviewed September 30, 2026, America/New_York. The app is a local Alexa+ simulation with actual Bedrock conversation, three MCP tools, and human-confirmed work decisions. Publication, video recording and Devpost submission remain review steps.
 
 ## Evidence
 
-| Requirement | Current evidence | Result |
+| Requirement | Evidence | Result |
 |---|---|---|
-| Separate app; Svelte 5/Vite, Node 24, SQLite | This repository's package manifest, server, and database; no core Projects imports | Implemented |
-| Six fictional work items with owners, blockers, next actions, completion criteria | `src/server/seed.mjs`, store assertions | Verified locally |
-| Conversation, work cards, precise proposal, saved history, simulation label | Browser journey tests; Wornpage controls and ChangePreview in `src/client/App.svelte` | Verified with a test model |
-| Nova Micro, Bedrock Converse, us-east-1, dedicated projects-amazon profile | `src/server/model.mjs`, pinned AWS SDK, actual failed provider receipt | Implemented; live success unproven |
-| Streamable HTTP MCP 2025-11-25 using SDK 1.31.0 | Real HTTP initialization, SDK client discovery, read/proposal calls | Verified locally |
-| Exactly get_briefing, get_work_item, propose_next_action | Wire-level tool list and validation tests; no confirmation tool | Verified locally |
-| Initialization, malformed inputs, protocol negotiation | Wire-level tests for latest/older/unknown versions, unsupported headers, invalid patches, unknown tools | Verified locally |
-| Human confirmation outside model permissions | Separate HttpOnly browser credential, origin and revision checks; MCP token cannot authenticate confirmation | Verified locally |
-| Exact current proposal; stale proposals fail; duplicate confirmation applies once | Store, API, and browser tests, including an actual double click | Verified locally |
-| Cancellation leaves items unchanged; next action does not complete work | Store and browser assertions; owner/blocker change updates counts while status stays active | Verified locally |
-| Briefing → proposal → confirmation → refresh → updated briefing | Automated browser conversation over real MCP and SQLite | Verified with a test model |
-| Persistence after restart and isolated sessions | A confirmed decision and conversation survive stopping one Node process and starting another; separate browser workspaces remain isolated | Verified locally |
-| Stubs only in tests; provider failures clearly unavailable | Test fixtures inject the model; production has no stub switch. Actual local preview shows inference paused | Verified locally |
-| One live batch, at most 20 attempts, bounded input, max 800 output tokens, no SDK retries | One retained batch, one denied attempt; persistent ledger and enforcement tests | Bounds verified; live journey incomplete |
-| Current pricing, $1 total test budget, receipts and stop on uncertain usage | Public price parser, full-context reservation affordability, retained out-of-limit usage, persistent ledger; aws:check reads that same ledger | Verified locally; denied attempt usage unresolved |
-| Setup, demo script, submission text, tool feedback, MIT public-source preparation | README, `docs/`, MIT license, pinned public dependencies and bundled notices | Prepared for review |
+| Separate Svelte 5/Vite, Node 24, SQLite app | Package manifest and independently authored source; no core Projects imports | Implemented |
+| Six fictional work items and explicit count definitions | Seed data, store and browser assertions | Verified locally |
+| Conversation, work cards, change review, history, simulation label | Wornpage interface; automated and actual-provider screenshots | Verified locally and live |
+| Nova Micro / Bedrock Converse / us-east-1 / projects-amazon | Retained successful provider usage and request IDs | Verified live |
+| Streamable HTTP MCP 2025-11-25 / SDK 1.31.0 | Initialization, discovery, malformed-input and protocol-negotiation tests | Verified locally |
+| Exactly three MCP tools; model executes them through the MCP client | Wire-level discovery and actual Bedrock tool traces | Verified locally and live |
+| Fresh facts each turn | Forced get_briefing selection and current-turn revision checks | Verified locally and live |
+| Human confirmation outside model permissions | Separate HttpOnly credential and browser origin checks; MCP token cannot confirm | Verified locally |
+| Displayed proposal is applied exactly once, only at its current revision | Store/API/browser tests for stale and duplicate confirmations; live displayed-value comparison | Verified locally and live |
+| Cancellation changes no work item; saving an action does not complete work | Automated tests plus actual-model proposal confirmation/cancellation | Verified locally and live |
+| Briefing → proposal → confirmation → refresh → updated briefing | Retained actual Bedrock continuation and persisted SQLite state | Verified live |
+| Restart persistence and isolated demo sessions | Actual process-restart tests; live confirmed decision survives subsequent servers | Verified locally; restart also live |
+| Test fixtures only in automated tests; clear provider failures | No production stub switch; unavailable-state tests and retained denied call | Verified locally and live |
+| One bounded live batch, ≤20 attempts, ≤800 output tokens, ≤24 KB input, no SDK retries | Shared persisted ledger across all continuations; 19 attempts | Verified |
+| $1 cap, current prices, retained failures, fail on unreviewed uncertainty | 40-test suite; actual receipts; original denial kept with reviewed $0.03 hold | Verified within retained bound; actual AWS bill unknown |
+| Setup, demo script, submission/tool-feedback drafts, MIT source preparation | README, docs, license and public dependency notices | Prepared for review |
 
-## Live gate
+The build and **40 automated tests pass**. Automated conversation responses use a fixture; they do not measure model reliability. The latest test also prevents starting a conversation with only one provider call remaining, because the mandatory fresh read leaves no allowance for a reply.
 
-The retained batch stopped after AccessDeniedException. No successful live conversation was produced. The original error receipt retained the provider request ID and code, but not its full explanation. New error receipts retain the bounded provider message and HTTP status. The original evidence remains unchanged.
+## Live evidence and retained failures
 
-Future reservations use Nova Micro's documented 128K context ceiling, rounded conservatively to 131,072 input tokens, plus the pinned 800 output tokens. The full reservation must fit before dispatch. Reported usage beyond either ceiling is retained with its response request ID and stops further calls. Two new regression cases bring the local suite to 34 passing tests. The original failed reservation and usage pause remain intact. [Model limits](https://docs.aws.amazon.com/en_en/bedrock/latest/userguide/model-card-amazon-nova-micro.html).
+The original denied batch is unchanged. Its cause remains unconfirmed, and it did not retain the full provider explanation. Later receipts retain bounded error messages and HTTP status. A free CountTokens diagnostic established that this Nova Micro deployment does not support token counting.
 
-Read-only AWS checks found an active Free plan, no AWS organization membership, an authorized/available model, and a nonzero Nova Micro on-demand token quota. These checks do not establish runtime access or identify the denial's cause. There is no evidence here that upgrading the account or broadening IAM permissions would fix it. Account-specific diagnostics and a support draft are retained privately under ignored `data/`.
+The later credential refresh had a distinct, reproducible `Region is missing` failure. Persisting `region = us-east-1` in the dedicated AWS profile fixed that refresh. A reviewed conservative hold made the original denial's maximum possible token cost affordable within the existing budget. One actual Converse diagnostic then succeeded. No paid-plan upgrade or IAM permission change was made. This does not establish why the original invocation was denied. The Basic Support case was still awaiting an AWS response at the last review.
 
-With owner approval, the diagnostic was sent through AWS Basic Support and an Account / Other Account Issues case was created. Its observed status was Unassigned; no denial explanation or usage confirmation had arrived. The case receipt and screenshot are retained privately under ignored `data/` and `output/`. Creating the case made no model calls and changed no paid plan or permissions.
+The retained batch continued with these findings:
 
-Resolve the denial and reconcile the retained usage before another inference attempt. Any resumption must preserve the failed record and remain within the original 20-attempt / $1 allowance. The app is not claimed complete or ready for a live demo while this gate is unresolved.
+| Observation | Action and resulting evidence |
+|---|---|
+| A proposal was attempted before a fresh workspace read | Forced get_briefing at the start of each turn; server revision guard remains |
+| A valid proposal omitted the prompt's trailing period | Harness checks intended wording, then verifies storage equals the exact displayed value; no proposal regenerated for punctuation |
+| Client-portal proposal confirmed and saved | Refresh, next actual Bedrock briefing and subsequent server restarts read the saved action; status remains active |
+| Owner-change request twice described a proposal without creating one | Both failures remain recorded. An explicit correction naming propose_next_action created a real pending card |
+| Real owner proposal cancelled | Refresh preserved the original owner, revision 2, and one confirmed decision |
 
-## Challenge requirements
+Important local receipts, excluded from the public repository:
 
-The current [requirements](https://amazonappdev2026.devpost.com/) and [FAQ](https://amazonappdev2026.devpost.com/details/faqs) were read in the browser. The deadline remains October 23, 2026, 3 p.m. EDT. The Alexa+ path accepts a locally runnable GitHub repository and a web simulation; gated preview access and public hosting are unnecessary. AWS Builder requires a documented AWS integration. A public English video under three minutes and product feedback are required at submission.
+- `data/live-validation.json`: original denied batch, unchanged.
+- `data/access-diagnostic-2026-09-30T04-33-57.344Z.json`: first successful bounded Converse diagnostic.
+- `data/live-validation-continuation-2026-09-30T04-53-18.413Z.json`: three passing checks for the core live journey, then an owner-proposal failure. Its status remains failed.
+- `data/live-validation-continuation-2026-09-30T05-00-14.855Z.json`: retained repeated owner-proposal failure.
+- `data/live-validation-continuation-2026-09-30T05-01-35.719Z.json`: successful explicit correction, real cancellation and desktop/mobile rendering, with a hash link to the prior core-journey evidence.
+- Matching `*-receipts.json` files retain usage. Screenshots are under `output/playwright/live-validation-2026-09-30T05-01-35.719Z/`.
+
+These establish the demonstrated workflow, not a general model-reliability rate. Tool selection can require correction; a prose description alone never creates a card or grants confirmation permission. The assistant's prose can also be verbose and expose formatting/planning text. The actual proposal and history cards remain the authoritative change record.
+
+## Budget at the validation checkpoint
+
+| Measure | Value | Meaning |
+|---|---:|---|
+| Attempted calls | 19 / 20 | Includes the original denial and every continuation |
+| Calls with usable usage | 18 | Returned token counts; not an AWS billing statement |
+| Estimated token cost | $0.001265915 | Usage multiplied by retained regional rates |
+| Denied call cost hold | $0.03 | Conservative bound; actual cost remains unknown |
+| Remaining dollar allowance | $0.968734085 | $1 minus estimate and hold |
+| Remaining calls | 1 | Insufficient for a new conversation, which needs at least two |
+
+Verified rates were $0.035 per million input tokens and $0.14 per million output tokens. [AWS regional price list](https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonBedrock/current/us-east-1/index.json).
+
+The denied receipt remains `uncertain`. Its operator review holds a full documented context in both directions at the higher historical/current rates, rounded up to a cent. The review retains the original receipt hash, original reservation, pricing sources and reason. It cannot reset call counts, change actual unknown usage to zero, or authorize an unaffordable retry. Any new unreviewed uncertainty stops inference. Future requests reserve the full 131,072-token input ceiling plus 800 output tokens. [Model limits](https://docs.aws.amazon.com/en_en/bedrock/latest/userguide/model-card-amazon-nova-micro.html).
+
+## Challenge delivery
+
+The reviewed [requirements](https://amazonappdev2026.devpost.com/) and [FAQ](https://amazonappdev2026.devpost.com/details/faqs) give an October 23, 2026, 3 p.m. EDT deadline. Alexa+ accepts a locally runnable repository and web simulation without partner-preview access or public hosting. AWS Builder requires a documented AWS integration. Submission still needs the reviewed public repository, an English video under three minutes, and product feedback. None has been published or submitted by this local validation.

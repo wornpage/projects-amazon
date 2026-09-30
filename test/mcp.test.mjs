@@ -99,3 +99,56 @@ test('an MCP bearer token cannot masquerade as the human confirmation cookie', a
   assert.equal(response.status, 401);
   assert.equal(runtime.store.history(session.workspace.sessionId).length, 0);
 });
+
+test('every turn forces a fresh briefing before a model can jump directly to proposing', async () => {
+  const choices = [];
+  const local = await startServer({ port: 0, databasePath: ':memory:', modelFactory: () => ({
+    availability: async () => ({ available: true }), close() {},
+    async converse({ messages, toolConfig }) {
+      choices.push(toolConfig.toolChoice);
+      const result = messages.at(-1).content.find(part => part.toolResult);
+      if (result) return { stopReason: 'end_turn', output: { message: { role: 'assistant', content: [{ text: `Observed revision ${result.toolResult.content[0].json.revision}.` }] } } };
+      const name = toolConfig.toolChoice?.tool?.name ?? 'propose_next_action';
+      return { stopReason: 'tool_use', output: { message: { role: 'assistant', content: [{ toolUse: {
+        toolUseId: `test-forced-${choices.length}`, name,
+        input: name === 'get_briefing' ? {} : { itemId: 'client-portal', sourceRevision: 1, changes: { owner: 'Unreviewed' } }
+      } }] } } };
+    }
+  }) });
+  try {
+    const session = await browserSession(local.origin);
+    const first = await session.post('/api/chat', { message: 'Read the workspace.' });
+    assert.equal(first.status, 200);
+    assert.equal(first.data.trace[0].result.revision, 1);
+    const proposal = local.store.propose(session.workspace.sessionId, { itemId: 'client-portal', sourceRevision: 1, changes: { owner: 'Morgan' } });
+    assert.equal((await session.post(`/api/proposals/${proposal.id}/confirm`, { sourceRevision: 1 })).status, 200);
+    const second = await session.post('/api/chat', { message: 'Continue working.' });
+    assert.equal(second.status, 200);
+    assert.equal(second.data.trace[0].result.revision, 2);
+    assert.deepEqual(choices, [{ tool: { name: 'get_briefing' } }, { auto: {} }, { tool: { name: 'get_briefing' } }, { auto: {} }]);
+    assert.equal(local.store.getWorkItem(session.workspace.sessionId, 'client-portal').owner, 'Morgan');
+  } finally { await local.close(); }
+});
+
+test('a conversation cannot spend the final call when its mandatory read leaves no allowance for a reply', async () => {
+  let dispatched = 0;
+  const local = await startServer({ port: 0, databasePath: ':memory:', modelFactory: () => ({
+    availability: async () => ({ available: true }), close() {},
+    async converse() { dispatched++; throw new Error('An incomplete turn must not start'); }
+  }) });
+  try {
+    for (let index = 0; index < 19; index++) {
+      const id = local.store.reserveInference(.001, {});
+      local.store.finishInference(id, .0001, {});
+    }
+    const session = await browserSession(local.origin);
+    assert.equal(session.workspace.model.available, false);
+    assert.equal(session.workspace.model.code, 'conversation_budget_exhausted');
+    const response = await session.post('/api/chat', { message: 'Read the workspace.' });
+    assert.equal(response.status, 503);
+    assert.equal(response.data.error.code, 'conversation_budget_exhausted');
+    assert.equal(local.store.budget().attemptedCalls, 19);
+    assert.equal(local.store.messages(session.workspace.sessionId).length, 0);
+    assert.equal(dispatched, 0);
+  } finally { await local.close(); }
+});

@@ -5,7 +5,7 @@ import { dirname, resolve } from 'node:path';
 import { SEED_ITEMS } from './seed.mjs';
 import { proposalSchema, parseInput } from './schemas.mjs';
 import { AppError } from './errors.mjs';
-import { inferenceBudget } from './inference-budget.mjs';
+import { inferenceBudget, createDenialCostReview } from './inference-budget.mjs';
 
 export function createStore(databasePath = ':memory:') {
   if (databasePath !== ':memory:') mkdirSync(dirname(databasePath), { recursive: true });
@@ -127,7 +127,7 @@ export function createStore(databasePath = ':memory:') {
     budget: () => inferenceBudget(db.prepare('SELECT * FROM inference ORDER BY rowid').all()),
     reserveInference: (reservedUsd, receipt) => atomic(() => {
       const budget = store.budget();
-      if (budget.uncertainCalls > 0) throw new AppError('usage_uncertain', 'A previous provider attempt has uncertain usage. Review its receipt before another live call.', 503);
+      if (budget.unreviewedUncertainCalls > 0) throw new AppError('usage_uncertain', 'A previous provider attempt has unreviewed usage. Establish its budget hold before another live call.', 503);
       if (db.prepare("SELECT id FROM inference WHERE status = 'reserved'").get()) throw new AppError('inference_busy', 'A live inference call is already in progress.', 409);
       if (budget.attemptedCalls >= 20 || reservedUsd > budget.remainingUsd) throw new AppError('budget_exhausted', 'The authorized inference test limit has been reached.', 503);
       if (!Number.isFinite(reservedUsd) || reservedUsd <= 0) throw new AppError('invalid_cost', 'A verified positive cost reservation is required.', 503);
@@ -148,6 +148,18 @@ export function createStore(databasePath = ':memory:') {
       const original = db.prepare('SELECT receipt FROM inference WHERE id = ?').get(id);
       if (original) db.prepare("UPDATE inference SET status = 'uncertain', receipt = ? WHERE id = ?").run(JSON.stringify({ ...JSON.parse(original.receipt), ...receipt }), id);
     },
+    reviewInferenceDenial: (id, pricing, reason) => atomic(() => {
+      const row = db.prepare('SELECT * FROM inference WHERE id = ?').get(id);
+      if (!row) throw new AppError('receipt_not_found', 'The retained provider attempt was not found.', 404);
+      const budgetReview = createDenialCostReview(row, pricing, reason);
+      const budget = store.budget();
+      if (budget.estimatedCostUsd + budget.reservedUsd - row.reserved_usd + budgetReview.heldUsd > budget.limitUsd) {
+        throw new AppError('budget_exhausted', 'The conservative hold would exhaust the authorized budget. No retry was authorized.', 503);
+      }
+      // Retain the status, original reservation, and all original receipt fields.
+      db.prepare('UPDATE inference SET receipt = ? WHERE id = ?').run(JSON.stringify({ ...JSON.parse(row.receipt), budgetReview }), id);
+      return budgetReview;
+    }),
     receipts: () => db.prepare('SELECT * FROM inference ORDER BY rowid').all().map(row => ({ id: row.id, status: row.status, reservedUsd: row.reserved_usd, estimatedCostUsd: row.actual_usd, createdAt: row.created_at, ...JSON.parse(row.receipt) }))
   };
   return store;

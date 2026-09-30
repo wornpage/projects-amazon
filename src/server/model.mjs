@@ -8,7 +8,7 @@ export const AWS_REGION = 'us-east-1';
 export const MODEL_ID = 'amazon.nova-micro-v1:0';
 export const PRICE_SOURCE = 'https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonBedrock/current/us-east-1/index.json';
 export const MODEL_LIMIT_SOURCE = 'https://docs.aws.amazon.com/en_en/bedrock/latest/userguide/model-card-amazon-nova-micro.html';
-const INPUT_TOKEN_CEILING = 128 * 1024;
+export const INPUT_TOKEN_CEILING = 128 * 1024;
 const OUTPUT_TOKEN_CEILING = 800;
 
 export async function fetchRates(fetcher = fetch) {
@@ -45,7 +45,7 @@ export function createBedrockModel(store, { send, resolveCredentials, ratesFetch
   return {
     async availability() {
       const budget = store.budget();
-      if (budget.uncertainCalls) return { available: false, code: 'usage_uncertain', message: 'A provider attempt has uncertain usage. Review the retained receipt before another call.' };
+      if (budget.unreviewedUncertainCalls) return { available: false, code: 'usage_uncertain', message: 'A provider attempt has unreviewed usage. Review the retained receipt and establish a conservative budget hold before another call.' };
       if (budget.attemptedCalls >= budget.callLimit || budget.remainingUsd <= 0) return { available: false, code: 'budget_exhausted', message: 'The authorized 20-call / $1 inference test limit has been reached.' };
       try { await credentials(); }
       catch { return { available: false, code: 'aws_credentials_unavailable', message: 'The projects-amazon AWS sign-in is unavailable or expired. Refresh that profile, then recheck the connection.' }; }
@@ -54,7 +54,7 @@ export function createBedrockModel(store, { send, resolveCredentials, ratesFetch
     async converse(input) {
       const availability = await this.availability();
       if (!availability.available) throw new AppError(availability.code, availability.message, 503);
-      const request = { ...input, modelId: MODEL_ID, inferenceConfig: { maxTokens: OUTPUT_TOKEN_CEILING, temperature: 0.2 } };
+      const request = { ...input, modelId: MODEL_ID, inferenceConfig: { maxTokens: OUTPUT_TOKEN_CEILING, temperature: 0 } };
       const bytes = Buffer.byteLength(JSON.stringify(request));
       if (bytes > 24000) throw new AppError('context_limit', 'This conversation exceeds the demo context limit. Start a new demo workspace.', 413);
       if (!rates || Date.now() - ratesAt > 3600000) { rates = await ratesFetcher(); ratesAt = Date.now(); }
