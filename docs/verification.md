@@ -20,16 +20,16 @@ Reviewed September 30, 2026, America/New_York. The app is a local Alexa+ simulat
 | Restart persistence and isolated demo sessions | Actual process-restart tests; live confirmed decision survives subsequent servers | Verified locally; restart also live |
 | Test fixtures only in automated tests; clear provider failures | No production stub switch; unavailable-state tests and retained denied call | Verified locally and live |
 | One bounded live batch, ≤20 attempts, ≤800 output tokens, ≤24 KB input, no SDK retries | Shared persisted ledger across all continuations; 19 attempts | Verified |
-| $1 cap, current prices, retained failures, fail on unreviewed uncertainty | 40-test suite; actual receipts; original denial kept with reviewed $0.03 hold | Verified within retained bound; actual AWS bill unknown |
+| $1 cap, current prices, retained failures, fail on unreviewed uncertainty | 46-test suite; actual receipts; original denial kept with reviewed $0.03 hold | Verified within retained bound; actual AWS bill unknown |
 | Setup, demo script, submission/tool-feedback drafts, MIT source preparation | README, docs, license and public dependency notices | Prepared for review |
 
-The build and **40 automated tests pass**. Automated conversation responses use a fixture; they do not measure model reliability. The latest test also prevents starting a conversation with only one provider call remaining, because the mandatory fresh read leaves no allowance for a reply.
+The build and **46 automated tests pass**. Automated conversation responses use a fixture; they do not measure model reliability. The suite prevents starting a conversation with only one provider call remaining, because the mandatory fresh read leaves no allowance for a reply.
 
 ## Live evidence and retained failures
 
 The original denied batch is unchanged. Its cause remains unconfirmed, and it did not retain the full provider explanation. Later receipts retain bounded error messages and HTTP status. A free CountTokens diagnostic established that this Nova Micro deployment does not support token counting.
 
-The later credential refresh had a distinct, reproducible `Region is missing` failure. Persisting `region = us-east-1` in the dedicated AWS profile fixed that refresh. A reviewed conservative hold made the original denial's maximum possible token cost affordable within the existing budget. One actual Converse diagnostic then succeeded. No paid-plan upgrade or IAM permission change was made. This does not establish why the original invocation was denied. The Basic Support case was still awaiting an AWS response at the last review.
+The later credential refresh had a distinct, reproducible `Region is missing` failure. Persisting `region = us-east-1` in the dedicated AWS profile fixed that refresh. A reviewed conservative hold made the original denial's maximum possible token cost affordable within the existing budget. One actual Converse diagnostic then succeeded. No paid-plan upgrade or IAM permission change was made. This does not establish why the original invocation was denied. At the owner's request, the Basic Support case was closed on September 30, 2026; AWS displayed Resolved and a Reopen case button. The closure did not provide a denial explanation or billing reconciliation. Its receipt and screenshot remain private under `data/` and `output/review/`.
 
 The retained batch continued with these findings:
 
@@ -50,7 +50,20 @@ Important local receipts, excluded from the public repository:
 - `data/live-validation-continuation-2026-09-30T05-01-35.719Z.json`: successful explicit correction, real cancellation and desktop/mobile rendering, with a hash link to the prior core-journey evidence.
 - Matching `*-receipts.json` files retain usage. Screenshots are under `output/playwright/live-validation-2026-09-30T05-01-35.719Z/`.
 
-These establish the demonstrated workflow, not a general model-reliability rate. Tool selection can require correction; a prose description alone never creates a card or grants confirmation permission. The assistant's prose can also be verbose and expose formatting/planning text. The actual proposal and history cards remain the authoritative change record.
+These establish the demonstrated workflow, not a general model-reliability rate. Tool selection can require correction; a prose description alone never creates a card or grants confirmation permission. The actual proposal and history cards remain the authoritative change record.
+
+## Local refinements after the live batch
+
+No further provider calls were made for these changes:
+
+- A successful proposal finishes the turn directly from the saved MCP result, with a concise app-generated review message. A regression test makes any third model call fail, proving the normal read/propose path needs two calls.
+- The briefing tool includes actual pending proposals and recent decision summaries, so later turns receive the state of human decisions alongside the work items.
+- Chat displays current proposal status from stored records, including confirmed, cancelled and stale. A fixture reproducing the observed false prose claim shows no proposal card or confirm control and explicitly states that no proposal was created.
+- Nova planning sections are excluded from visible assistant text and subsequent model text history. Tests cover multiple, nested, unclosed and planning-only outputs, preserve user text, and keep previously retained message records unchanged.
+
+The build and local/browser regressions pass. These checks do not establish improved natural-language tool selection against Nova; that needs a separately authorized live allowance. Plain-text briefing replies may still contain Markdown markers.
+
+The previously saved actual Bedrock session was also opened with the new interface on desktop and mobile. Confirmed/cancelled labels, concise proposal text, hidden planning sections and the original saved decision were verified with zero inference calls. That read-only receipt is `output/review/saved-live-history-refinement-v2.json`; it is display/persistence evidence, not a new model-validation run.
 
 ## Budget at the validation checkpoint
 

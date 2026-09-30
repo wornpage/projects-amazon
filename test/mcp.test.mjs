@@ -39,14 +39,22 @@ test('official MCP client discovers precisely three tools and executes reads and
     const before = await client.callTool({ name: 'get_briefing', arguments: {} });
     assert.equal(before.structuredContent.items.length, 6);
     assert.equal(before.structuredContent.sessionId, undefined);
+    assert.deepEqual(before.structuredContent.pendingProposals, []);
+    assert.deepEqual(before.structuredContent.recentDecisions, []);
     const proposed = await client.callTool({ name: 'propose_next_action', arguments: { itemId: 'client-portal', sourceRevision: 1, changes: { nextAction: 'Review the welcome copy tomorrow.' } } });
     assert.equal(proposed.structuredContent.status, 'pending');
     const item = await client.callTool({ name: 'get_work_item', arguments: { itemId: 'client-portal' } });
     assert.equal(item.structuredContent.nextAction, 'Ask Jordan for the final welcome copy.');
+    const pendingRead = await client.callTool({ name: 'get_briefing', arguments: {} });
+    assert.deepEqual(pendingRead.structuredContent.pendingProposals, [{ id: proposed.structuredContent.id, itemId: 'client-portal', sourceRevision: 1, changes: { nextAction: 'Review the welcome copy tomorrow.' } }]);
     const confirmed = await session.post(`/api/proposals/${proposed.structuredContent.id}/confirm`, { sourceRevision: 1 });
     assert.equal(confirmed.status, 200); assert.equal(confirmed.data.applied, true);
     const repeated = await session.post(`/api/proposals/${proposed.structuredContent.id}/confirm`, { sourceRevision: 1 });
     assert.equal(repeated.data.applied, false); assert.equal(repeated.data.workspace.history.length, 1);
+    const savedRead = await client.callTool({ name: 'get_briefing', arguments: {} });
+    assert.deepEqual(savedRead.structuredContent.pendingProposals, []);
+    assert.equal(savedRead.structuredContent.recentDecisions.length, 1);
+    assert.equal(savedRead.structuredContent.recentDecisions[0].revision, 2);
   } finally { await client.close(); }
 });
 test('malformed tool inputs and hidden confirmation tools cannot change work', async () => {
@@ -150,5 +158,74 @@ test('a conversation cannot spend the final call when its mandatory read leaves 
     assert.equal(local.store.budget().attemptedCalls, 19);
     assert.equal(local.store.messages(session.workspace.sessionId).length, 0);
     assert.equal(dispatched, 0);
+  } finally { await local.close(); }
+});
+
+test('a saved MCP proposal completes the turn without a model-generated confirmation or third call', async () => {
+  let calls = 0;
+  const local = await startServer({ port: 0, databasePath: ':memory:', modelFactory: () => {
+    const fixture = scriptedModel();
+    return { ...fixture, async converse(input) {
+      if (++calls > 2) throw new Error('A saved proposal must not spend a third call');
+      return fixture.converse(input);
+    } };
+  } });
+  try {
+    const session = await browserSession(local.origin);
+    const response = await session.post('/api/chat', { message: 'Propose updating the client portal next action.' });
+    assert.equal(response.status, 200);
+    assert.equal(calls, 2);
+    const pending = response.data.workspace.proposals[0];
+    assert.equal(pending.status, 'pending');
+    assert.equal(response.data.trace.at(-1).result.id, pending.id);
+    assert.equal(response.data.text, `Prepared a change for “${pending.original.title}”.\nReview the proposed values in the change card. Work stays unchanged until you confirm.`);
+    assert.equal(local.store.getWorkItem(session.workspace.sessionId, 'client-portal').nextAction, pending.original.nextAction);
+    assert.equal(local.store.history(session.workspace.sessionId).length, 0);
+  } finally { await local.close(); }
+});
+
+test('planning text is excluded from new replies and model history while old retained messages are preserved', async () => {
+  const inputs = [];
+  const local = await startServer({ port: 0, databasePath: ':memory:', modelFactory: () => {
+    const fixture = scriptedModel();
+    return { ...fixture, async converse(input) {
+      inputs.push(input);
+      const response = await fixture.converse(input);
+      if (response.stopReason === 'end_turn') response.output.message.content = [{ text: '<thinking>NEW_PRIVATE_PLAN</thinking>The workspace is ready to review.' }];
+      return response;
+    } };
+  } });
+  try {
+    const session = await browserSession(local.origin);
+    const retained = '<thinking>OLD_PRIVATE_PLAN</thinking>Previous visible reply.';
+    local.store.addMessage(session.workspace.sessionId, 'assistant', retained);
+    const response = await session.post('/api/chat', { message: 'Read the workspace.' });
+    assert.equal(response.status, 200);
+    assert.equal(response.data.text, 'The workspace is ready to review.');
+    assert.ok(inputs.every(input => !JSON.stringify(input.messages).includes('OLD_PRIVATE_PLAN')));
+    assert.equal(local.store.messages(session.workspace.sessionId)[0].text, retained);
+    assert.equal(local.store.messages(session.workspace.sessionId).at(-1).text, response.data.text);
+  } finally { await local.close(); }
+});
+
+test('a planning-only model response fails without a fabricated answer or proposal', async () => {
+  let calls = 0;
+  const local = await startServer({ port: 0, databasePath: ':memory:', modelFactory: () => {
+    const fixture = scriptedModel();
+    return { ...fixture, async converse(input) {
+      calls++;
+      const response = await fixture.converse(input);
+      if (response.stopReason === 'end_turn') response.output.message.content = [{ text: '<thinking>Unfinished planning' }];
+      return response;
+    } };
+  } });
+  try {
+    const session = await browserSession(local.origin);
+    const response = await session.post('/api/chat', { message: 'Read the workspace.' });
+    assert.equal(response.status, 502);
+    assert.equal(response.data.error.code, 'empty_model_response');
+    assert.equal(calls, 2);
+    assert.equal(local.store.messages(session.workspace.sessionId).filter(message => message.role === 'assistant').length, 0);
+    assert.equal(local.store.proposals(session.workspace.sessionId).length, 0);
   } finally { await local.close(); }
 });

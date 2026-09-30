@@ -6,6 +6,7 @@
   import { Tabs, tabDomIds } from '@wornpage/tabs';
   import { Alert } from '@wornpage/alert';
   import { Badge, ChangePreview } from '@wornpage/data-display';
+  import { conversationText } from '../shared/conversation-text.mjs';
   let workspace = $state(null);
   let loading = $state(true);
   let busy = $state(false);
@@ -29,6 +30,16 @@
     after: (field in changes ? changes[field] : original[field]) || 'No blocker recorded'
   }));
   const time = value => new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' }).format(new Date(value));
+  function proposalEvidence(entry) {
+    return entry.trace.filter(call => call.tool === 'propose_next_action' && !call.error).map(call => {
+      const proposal = workspace.proposals.find(value => value.id === call.result.id);
+      if (!proposal) return { id: call.result.id, label: 'Proposal record unavailable', variant: 'warn' };
+      if (proposal.status === 'confirmed') return { id: proposal.id, label: 'Confirmed', variant: 'default' };
+      if (proposal.status === 'cancelled') return { id: proposal.id, label: 'Cancelled', variant: 'muted' };
+      if (proposal.sourceRevision !== workspace.revision) return { id: proposal.id, label: 'Needs a fresh proposal', variant: 'warn' };
+      return { id: proposal.id, label: 'Awaiting your confirmation', variant: 'warn' };
+    });
+  }
 
   async function request(path, body) {
     const response = await fetch(path, body === undefined ? {} : {
@@ -106,8 +117,13 @@
               <div class="starter-questions"><span>TRY ASKING</span>{#each prompts as prompt}<Button class="starter-button" onclick={() => send(prompt)} disabled={busy || !workspace.model.available}>{prompt}<span aria-hidden="true">↗</span></Button>{/each}</div>
             {:else}
               {#each workspace.messages as entry (entry.id)}
+                {@const evidence = proposalEvidence(entry)}
                 <article class:from-user={entry.role === 'user'} class:connection-notice={entry.role === 'notice'} class="chat-message">
-                  <div class="message-meta"><strong>{entry.role === 'user' ? 'You' : entry.role === 'notice' ? 'Connection notice' : 'Briefing'}</strong><time datetime={entry.createdAt}>{time(entry.createdAt)}</time></div><p>{entry.text}</p>
+                  <div class="message-meta"><strong>{entry.role === 'user' ? 'You' : entry.role === 'notice' ? 'Connection notice' : 'Briefing'}</strong><time datetime={entry.createdAt}>{time(entry.createdAt)}</time></div><p>{conversationText(entry)}</p>
+                  {#if entry.role !== 'user'}<div class="message-evidence" data-testid="message-evidence">
+                    {#each evidence as result (result.id)}<Badge label={result.label} variant={result.variant} size="sm" />{/each}
+                    {#if evidence.length === 0}<span>No proposal created in this turn.</span>{/if}
+                  </div>{/if}
                   {#if entry.trace.length}<div class="tool-trace"><Accordion label={`${entry.trace.length} MCP tool ${entry.trace.length === 1 ? 'call' : 'calls'}`}><ol>{#each entry.trace as call}<li><code>{call.tool}</code><span>{call.error ? 'Returned an error' : 'Read or proposed demo state'}</span></li>{/each}</ol></Accordion></div>{/if}
                 </article>
               {/each}

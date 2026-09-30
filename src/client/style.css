@@ -102,6 +102,7 @@ h2 { font-family: 'Manrope Variable', system-ui, sans-serif; font-size: 18px; li
 .message-meta strong { font-size: 11px; font-weight: 600; }
 .message-meta time { font-size: 10px; color: var(--muted); margin-left: auto; }
 .chat-message p { white-space: pre-wrap; overflow-wrap: anywhere; color: #52634e; }
+.message-evidence { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; color: var(--muted); font-size: 11px; }
 .tool-trace { margin-top: 12px; font-size: 11px; color: #52634e; }
 .tool-trace ol { padding-left: 16px; line-height: 1.8; margin: 0; }
 .tool-trace li span { display: block; }

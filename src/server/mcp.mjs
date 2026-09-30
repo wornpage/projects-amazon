@@ -15,12 +15,15 @@ const guarded = fn => async input => {
 export function createMcpServer(store, sessionId) {
   const server = new McpServer({ name: 'projects-briefing', version: '0.1.0' });
   server.registerTool('get_briefing', {
-    description: 'Read the six demo work items, their owners, blockers, next actions, completion criteria, and the current workspace revision. Read before proposing a change.',
+    description: 'Read the six demo work items, current workspace revision, pending proposals, and recent decision summaries. Read before proposing a change. Describing a change does not create a pending proposal.',
     inputSchema: z.strictObject({}),
     annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false }
   }, guarded(() => {
     const { sessionId: credential, ...briefing } = store.briefing(sessionId);
-    return briefing;
+    const pendingProposals = store.proposals(sessionId).filter(value => value.status === 'pending')
+      .map(({ id, itemId, sourceRevision, changes }) => ({ id, itemId, sourceRevision, changes }));
+    const recentDecisions = store.history(sessionId).slice(0, 5).map(value => ({ itemId: value.itemId, revision: value.revision, createdAt: value.createdAt }));
+    return { ...briefing, pendingProposals, recentDecisions };
   }));
   server.registerTool('get_work_item', {
     description: 'Inspect one work item and its saved decision history.',

@@ -16,7 +16,7 @@ export function scriptedModel() {
         return final(`Studio launch has ${data.counts.open} open items and ${data.counts.blocked} blocked items. Client portal next action: ${data.items.find(item => item.id === 'client-portal').nextAction} Workspace revision ${data.revision}.`);
       }
       if (data.error) return final(`The tool returned ${data.error.code}. No item was changed.`);
-      return final('I prepared a next-action proposal for the client portal. Review the card and confirm it to save the decision. The work item is unchanged until you confirm.');
+      throw new Error('The application must finish a saved proposal without a model-generated confirmation.');
     },
     close() {}
   };

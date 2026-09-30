@@ -61,6 +61,7 @@ test('browser: briefing, proposal, confirmation, refresh, updated briefing and i
   await page.getByText(/Studio launch has 5 open items/).waitFor();
   await chat(page, 'Propose updating the client portal next action.');
   await page.getByRole('button', { name: /Confirm action/ }).waitFor();
+  await page.getByTestId('message-evidence').getByText('Awaiting your confirmation', { exact: true }).waitFor();
   const proposal = page.getByTestId('proposal-card');
   await proposal.getByText('1 of 3 fields changes.', { exact: true }).waitFor();
   const unchanged = proposal.getByRole('button', { name: /^(Show 2 unchanged fields|Hide unchanged fields)$/ });
@@ -80,6 +81,7 @@ test('browser: briefing, proposal, confirmation, refresh, updated briefing and i
   assert.match(await page.getByTestId('item-client-portal').innerText(), /approved welcome copy tomorrow/);
   assert.match(await page.getByTestId('item-client-portal').innerText(), /Waiting/);
   await page.reload(); await page.getByTestId('item-client-portal').waitFor();
+  await page.getByTestId('message-evidence').getByText('Confirmed', { exact: true }).waitFor();
   assert.match(await page.getByTestId('item-client-portal').innerText(), /approved welcome copy tomorrow/);
   await chat(page, 'What is the next action now?');
   await page.locator('.conversation-body').getByText(/Workspace revision 2/).waitFor();
@@ -100,10 +102,29 @@ test('browser: cancellation leaves the item and revision unchanged', async () =>
   await page.getByRole('button', { name: 'Cancel proposal', exact: true }).waitFor();
   await page.getByRole('button', { name: 'Cancel proposal', exact: true }).click();
   await page.getByText('Proposal cancelled. The work item is unchanged.').waitFor();
+  await page.getByTestId('message-evidence').getByText('Cancelled', { exact: true }).waitFor();
   assert.match(await page.getByTestId('item-client-portal').innerText(), /final welcome copy/);
   assert.equal(await page.getByTestId('proposal-card').count(), 0);
   assert.match(await page.locator('.workspace-label').innerText(), /revision 1/);
   await context.close();
+});
+
+test('browser: prose without a tool result cannot present a proposal, and planning text is hidden', async () => {
+  const { context, page } = await newPage();
+  try {
+    const workspace = await (await page.request.get(`${runtime.origin}/api/workspace`)).json();
+    runtime.store.addMessage(workspace.sessionId, 'user', 'Keep the literal label <thinking> visible.');
+    runtime.store.addMessage(workspace.sessionId, 'assistant', '<thinking>PRIVATE_PLAN_NOT_FOR_DISPLAY</thinking>I prepared a proposal. Click Confirm action.', [{ tool: 'get_briefing', input: {}, result: { revision: 1 }, error: false }]);
+    await page.reload();
+    await page.getByText('I prepared a proposal. Click Confirm action.', { exact: true }).waitFor();
+    await page.getByTestId('message-evidence').getByText('No proposal created in this turn.', { exact: true }).waitFor();
+    assert.equal(await page.getByText('PRIVATE_PLAN_NOT_FOR_DISPLAY', { exact: false }).count(), 0);
+    assert.equal(await page.getByText('Keep the literal label <thinking> visible.', { exact: true }).count(), 1);
+    assert.equal(await page.getByTestId('proposal-card').count(), 0);
+    assert.equal(await page.getByRole('button', { name: /Confirm action/ }).count(), 0);
+    assert.equal(runtime.store.messages(workspace.sessionId).at(-1).text.includes('PRIVATE_PLAN_NOT_FOR_DISPLAY'), true);
+    await page.screenshot({ path: resolve(output, 'automated-test-no-proposal-evidence.png'), fullPage: true });
+  } finally { await context.close(); }
 });
 test('browser: reviewed owner and blocker changes persist and update counts without completing work', async () => {
   const { context, page } = await newPage();
@@ -152,6 +173,7 @@ test('browser: out-of-band confirmed change disables stale confirmation', async 
   assert.equal(response.status(), 200);
   await client.close(); await page.reload();
   await page.getByText('The workspace changed. Ask for a fresh proposal before confirming.').waitFor();
+  await page.getByTestId('message-evidence').getByText('Needs a fresh proposal', { exact: true }).waitFor();
   assert.equal(await page.getByRole('button', { name: /Confirm action/ }).isDisabled(), true);
   assert.match(await page.getByTestId('item-client-portal').innerText(), /final welcome copy/);
   await context.close();

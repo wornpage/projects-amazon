@@ -63,7 +63,9 @@ npm run mcp:session
 
 This creates a new fictional workspace and prints its MCP bearer token and the three tools: `get_briefing`, `get_work_item`, and `propose_next_action`. The token is not an AWS credential and cannot authenticate the browser confirmation endpoint. The human browser cookie is separate and HttpOnly.
 
-The Bedrock conversation executes real MCP tool calls. Each turn forces a fresh `get_briefing` call before allowing other tool choices. A proposal records exact changed fields and the observed revision. Only a browser-confirmed action changes an item; stale proposals fail, duplicate confirmation applies once, and cancellation leaves the item unchanged. Updating a next action does not mark completion. Decision history retains the before/after values.
+The Bedrock conversation executes real MCP tool calls. Each turn forces a fresh `get_briefing` call, including pending proposals and recent decision summaries, before allowing other tool choices. A successful proposal tool result produces the app's concise review message immediately; no extra model call is used to restate it. A proposal records exact changed fields and the observed revision. Only a browser-confirmed action changes an item; stale proposals fail, duplicate confirmation applies once, and cancellation leaves the item unchanged. Updating a next action does not mark completion. Decision history retains the before/after values.
+
+Each assistant turn displays proposal evidence from the stored tool result and current proposal status. Prose alone shows **No proposal created in this turn**. Existing chat entries update to confirmed, cancelled or stale as appropriate. Nova planning sections are omitted from visible replies and subsequent model text history; previously retained message records are preserved.
 
 ## Tests and bounded live validation
 
@@ -84,11 +86,13 @@ A locally reviewed `AccessDeniedException` can receive a conservative cost hold 
 
 ## Current verification
 
-The production build and **40 automated tests pass**, including the complete browser confirmation journey, persistence through an actual Node server restart, isolated sessions, malformed MCP calls, protocol negotiation, stale proposals, double clicks, cancellation, owner/blocker changes, keyboard interaction, and retained-budget enforcement. Automated conversation tests use an explicitly injected model fixture. See [verification.md](docs/verification.md) for the full evidence and limitations.
+The production build and **46 automated tests pass**, including the complete browser confirmation journey, persistence through an actual Node server restart, isolated sessions, malformed MCP calls, protocol negotiation, stale proposals, double clicks, cancellation, owner/blocker changes, keyboard interaction, proposal-status evidence, planning-text handling, and retained-budget enforcement. Automated conversation tests use an explicitly injected model fixture. See [verification.md](docs/verification.md) for the full evidence and limitations.
 
 On September 30, 2026, the actual Bedrock → MCP → browser journey passed: read a briefing, propose a client-portal next action, confirm exactly the displayed text, refresh, and read the saved action in a subsequent live briefing. A real owner-change proposal was also cancelled without changing the item or revision. This continuation preserves the original denied call and every intervening failed check.
 
 **Limits of this evidence:** the owner-change request twice produced a prose description without calling the proposal tool; an explicit correction naming the tool produced the card. Natural-language tool selection needs further evaluation. A described change is actionable only when the actual review card exists. The first AccessDenied cause and actual billed usage remain unknown; its reviewed **$0.03 hold** remains in the ledger.
+
+The subsequent response/status refinements are locally tested; no new Bedrock calls were made for them. The support case was closed at the owner's request after access was demonstrated. Closing it does not reconcile the original denied request's actual usage.
 
 The completed validation used **19/20 attempts**, with **$0.001265915** in token-cost estimates and **$0.03** held, leaving **$0.968734085** under the $1 ceiling. Only one provider call remains. Conversation is therefore unavailable under the current allowance: even a fresh briefing needs two calls. Browsing saved work and decisions makes no inference calls. A fresh demo recording needs a separately authorized allowance; the app contains no budget-reset control.
 
