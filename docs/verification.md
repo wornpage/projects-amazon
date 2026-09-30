@@ -29,6 +29,8 @@ The retained batch stopped after AccessDeniedException. No successful live conve
 
 Read-only AWS checks found an active Free plan, no AWS organization membership, an authorized/available model, and a nonzero Nova Micro on-demand token quota. These checks do not establish runtime access or identify the denial's cause. There is no evidence here that upgrading the account or broadening IAM permissions would fix it. Account-specific diagnostics and a support draft are retained privately under ignored `data/`.
 
+With owner approval, the diagnostic was sent through AWS Basic Support and an Account / Other Account Issues case was created. Its observed status was Unassigned; no denial explanation or usage confirmation had arrived. The case receipt and screenshot are retained privately under ignored `data/` and `output/`. Creating the case made no model calls and changed no paid plan or permissions.
+
 Resolve the denial and reconcile the retained usage before another inference attempt. Any resumption must preserve the failed record and remain within the original 20-attempt / $1 allowance. The app is not claimed complete or ready for a live demo while this gate is unresolved.
 
 ## Challenge requirements
