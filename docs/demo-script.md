@@ -1,5 +1,7 @@
 # Demonstration script — target 2 minutes 40 seconds
 
+A separate **90-second captioned review cut** is prepared locally at `output/review/demo-review/projects-briefing-review.mp4`, with `captions.srt` and a capture receipt. It walks through actual saved October 1 Bedrock results and identifies itself as saved evidence. It contains screenshots and English captions, no narration audio, no fresh inference, and no simulated confirmation click. Review that cut before deciding whether to record the fresh interactive version below. The local video is excluded from the source ZIP.
+
 The live workflow is validated; review `verification.md` and the retained screenshots first. A fresh recording needs a separately authorized inference allowance because 29 of the approved 30 total calls have been used. Record the real Bedrock runtime in a fresh fictional workspace. Keep the simulation label visible. Do not show AWS authorization codes, credentials or private account pages.
 
 | Time | On screen | Narration |

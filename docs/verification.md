@@ -109,4 +109,6 @@ Current regional rates were reverified from the official AWS price list: $0.035 
 
 ## Challenge delivery
 
+A read-only saved-session capture and approximately 90-second English-captioned review video are retained under `output/review/demo-review/`. Five actual app views cover work, tool traces, the confirmed change, unchanged fields, and connection/budget boundaries. Capture blocked writes and non-loopback requests and verified identical before/after inference-ledger SHA-256 values. The cut uses screenshots, contains no narration audio, and is explicitly a saved-results walkthrough, not a new inference or confirmation run. See [review-handoff.md](review-handoff.md) for review artifacts and remaining external steps.
+
 The reviewed [requirements](https://amazonappdev2026.devpost.com/) and [FAQ](https://amazonappdev2026.devpost.com/details/faqs) give an October 23, 2026, 3 p.m. EDT deadline. Alexa+ accepts a locally runnable repository and web simulation without partner-preview access or public hosting. AWS Builder requires a documented AWS integration. Submission still needs the reviewed public repository, an English video under three minutes, and product feedback. None has been published or submitted by this local validation.

@@ -18,6 +18,6 @@ This application was independently created during the challenge window. It uses 
 
 **Observed limitation:** the owner-change request twice produced only a prose description. An explicit correction naming the proposal tool created the real card. Model tool selection needs further evaluation; a textual claim never grants confirmation permission or changes an item. Automated fixtures prove application behavior, not general model reliability.
 
-Subsequent local refinements render proposal replies from actual tool results, show current proposal status in chat, include pending proposals in fresh briefings, and hide planning sections. They pass local regressions; they have not consumed additional live calls. The support case was closed at the owner's request after successful runtime access was demonstrated.
+The interface renders proposal replies from actual tool results, shows current proposal status in chat, includes pending proposals in fresh briefings, and hides planning sections. These changes pass local regressions and were exercised in the October 1 live workflow. The support case was closed at the owner's request after successful runtime access was demonstrated.
 
 **Before submitting:** insert the reviewed GitHub repository URL and a public English demo video under three minutes. Review the observed limitations and include the product feedback. A fresh recording needs a separately authorized inference allowance: the current batch has only one call left. Repository publication, reviewer access and Devpost submission have not been performed.

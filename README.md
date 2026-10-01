@@ -102,6 +102,8 @@ The operator-only `store.extendInferenceAllowance(callLimit, reason)` records an
 
 ## Challenge materials
 
+The local captioned review video and the complete owner review checklist are described in [review-handoff.md](docs/review-handoff.md). Video preparation used the saved actual Bedrock session and made zero inference calls.
+
 See [demo-script.md](docs/demo-script.md), [submission.md](docs/submission.md) and [product-feedback.md](docs/product-feedback.md). The challenge deadline is **October 23, 2026, 3 p.m. America/New_York**. A locally runnable repository and demonstration video are accepted for Alexa+; public hosting is not required. Prepare a video under three minutes and complete the required product feedback. Publishing the repository and submitting the entry are separate review steps.
 
 Sources: [official requirements](https://amazonappdev2026.devpost.com/), [official FAQ](https://amazonappdev2026.devpost.com/details/faqs), [Nova Micro](https://docs.aws.amazon.com/en_en/bedrock/latest/userguide/model-card-amazon-nova-micro.html), [MCP transport specification](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports).
