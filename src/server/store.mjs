@@ -34,6 +34,7 @@ export function createStore(databasePath = ':memory:') {
     CREATE TABLE IF NOT EXISTS decisions (id TEXT PRIMARY KEY, session_id TEXT NOT NULL REFERENCES sessions(id), proposal_id TEXT NOT NULL UNIQUE REFERENCES proposals(id), item_id TEXT NOT NULL, revision INTEGER NOT NULL, before_data TEXT NOT NULL, after_data TEXT NOT NULL, created_at TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS messages (seq INTEGER PRIMARY KEY AUTOINCREMENT, session_id TEXT NOT NULL REFERENCES sessions(id), role TEXT NOT NULL CHECK(role IN ('user','assistant','notice')), text TEXT NOT NULL, trace TEXT NOT NULL, created_at TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS inference (id TEXT PRIMARY KEY, status TEXT NOT NULL CHECK(status IN ('reserved','complete','uncertain')), reserved_usd REAL NOT NULL, actual_usd REAL, receipt TEXT NOT NULL, created_at TEXT NOT NULL);
+    CREATE TABLE IF NOT EXISTS inference_authorizations (id TEXT PRIMARY KEY, call_limit INTEGER NOT NULL, limit_usd REAL NOT NULL, reason TEXT NOT NULL, created_at TEXT NOT NULL);
   `);
   if (!db.prepare('PRAGMA table_info(sessions)').all().some(column => column.name === 'browser_root')) {
     db.exec('BEGIN IMMEDIATE; ALTER TABLE sessions ADD COLUMN browser_root TEXT; UPDATE sessions SET browser_root = id; COMMIT;');
@@ -140,12 +141,21 @@ export function createStore(databasePath = ':memory:') {
       session(sessionId);
       db.prepare('INSERT INTO messages (session_id, role, text, trace, created_at) VALUES (?, ?, ?, ?, ?)').run(sessionId, role, text, JSON.stringify(trace), new Date().toISOString());
     },
-    budget: () => inferenceBudget(db.prepare('SELECT * FROM inference ORDER BY rowid').all()),
+    authorizations: () => db.prepare('SELECT * FROM inference_authorizations ORDER BY rowid').all(),
+    budget: () => inferenceBudget(db.prepare('SELECT * FROM inference ORDER BY rowid').all(), store.authorizations()),
+    extendInferenceAllowance: (callLimit, reason) => atomic(() => {
+      if (!Number.isSafeInteger(callLimit) || callLimit <= store.budget().callLimit || callLimit > 30 || typeof reason !== 'string' || reason.trim().length < 10 || reason.length > 1500) {
+        throw new AppError('invalid_authorization', 'Record an explicit owner-approved extension up to 30 total calls. The $1 cap is unchanged.');
+      }
+      const record = { id: randomUUID(), call_limit: callLimit, limit_usd: 1, reason: reason.trim(), created_at: new Date().toISOString() };
+      db.prepare('INSERT INTO inference_authorizations VALUES (?, ?, ?, ?, ?)').run(record.id, record.call_limit, record.limit_usd, record.reason, record.created_at);
+      return record;
+    }),
     reserveInference: (reservedUsd, receipt) => atomic(() => {
       const budget = store.budget();
       if (budget.unreviewedUncertainCalls > 0) throw new AppError('usage_uncertain', 'A previous provider attempt has unreviewed usage. Establish its budget hold before another live call.', 503);
       if (db.prepare("SELECT id FROM inference WHERE status = 'reserved'").get()) throw new AppError('inference_busy', 'A live inference call is already in progress.', 409);
-      if (budget.attemptedCalls >= 20 || reservedUsd > budget.remainingUsd) throw new AppError('budget_exhausted', 'The authorized inference test limit has been reached.', 503);
+      if (budget.attemptedCalls >= budget.callLimit || reservedUsd > budget.remainingUsd) throw new AppError('budget_exhausted', 'The authorized inference test limit has been reached.', 503);
       if (!Number.isFinite(reservedUsd) || reservedUsd <= 0) throw new AppError('invalid_cost', 'A verified positive cost reservation is required.', 503);
       const id = randomUUID();
       db.prepare("INSERT INTO inference VALUES (?, 'reserved', ?, NULL, ?, ?)").run(id, reservedUsd, JSON.stringify(receipt), new Date().toISOString());

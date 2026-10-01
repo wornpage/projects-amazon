@@ -39,6 +39,26 @@ test('a new project preflight creates no state, and unreadable ledgers fail', ()
 const pricing = () => ({ modelId: MODEL_ID, region: AWS_REGION, source: PRICE_SOURCE,
   sha256: 'a'.repeat(64), verifiedAt: new Date().toISOString(),
   input: { usdPerToken: .000000035 }, output: { usdPerToken: .00000014 } });
+
+test('an explicit owner extension retains all usage, the $1 cap and the new ceiling across restart', () => {
+  const temporary = temporaryDirectory(); const path = join(temporary.directory, 'extension.sqlite');
+  let store = createStore(path);
+  try {
+    for (let count = 0; count < 20; count++) { const id = store.reserveInference(.001, {}); store.finishInference(id, .0001, {}); }
+    const receipts = store.receipts();
+    const authorization = store.extendInferenceAllowance(30, 'Automated test: explicit owner approval for ten more calls');
+    assert.equal(authorization.limit_usd, 1);
+    assert.deepEqual(store.receipts(), receipts);
+    assert.equal(store.budget().attemptedCalls, 20);
+    assert.equal(store.budget().callLimit, 30);
+    store.close(); store = createStore(path);
+    assert.equal(readInferenceBudget(path).callLimit, 30);
+    for (let count = 20; count < 30; count++) { const id = store.reserveInference(.001, {}); store.finishInference(id, .0001, {}); }
+    assert.throws(() => store.reserveInference(.001, {}), error => error.code === 'budget_exhausted');
+    assert.throws(() => store.extendInferenceAllowance(31, 'Cannot authorize an unapproved ceiling'), error => error.code === 'invalid_authorization');
+    assert.throws(() => store.extendInferenceAllowance(30, 'Cannot reset or repeat the current allowance'), error => error.code === 'invalid_authorization');
+  } finally { store.close(); temporary.remove(); }
+});
 function deniedAttempt(store, overrides = {}) {
   const id = store.reserveInference(.0004, { modelId: MODEL_ID, region: AWS_REGION,
     profile: AWS_PROFILE, requestBytes: 2812, pricing: pricing(), ...overrides });

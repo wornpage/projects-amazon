@@ -47,7 +47,14 @@ function retainedReview(row) {
   return budgetReview;
 }
 
-export function inferenceBudget(rows) {
+export function inferenceBudget(rows, authorizations = []) {
+  let callLimit = 20;
+  for (const authorization of authorizations) {
+    if (!Number.isSafeInteger(authorization.call_limit) || authorization.call_limit <= callLimit || authorization.call_limit > 30 || authorization.limit_usd !== 1 || typeof authorization.reason !== 'string' || authorization.reason.trim().length < 10) {
+      throw new AppError('invalid_authorization', 'The retained inference allowance is invalid. No call was authorized.', 503);
+    }
+    callLimit = authorization.call_limit;
+  }
   const completed = rows.filter(row => row.status === 'complete');
   const estimatedCostUsd = completed.reduce((sum, row) => sum + row.actual_usd, 0);
   const reviewedRows = rows.map(row => ({ row, review: retainedReview(row) }));
@@ -55,7 +62,7 @@ export function inferenceBudget(rows) {
   const uncertainCalls = rows.filter(row => row.status === 'uncertain').length;
   const reservedUsd = reviewedRows.filter(({ row }) => row.status !== 'complete').reduce((sum, { row, review }) => sum + (review?.heldUsd ?? row.reserved_usd), 0);
   return {
-    limitUsd: 1, callLimit: 20, attemptedCalls: rows.length,
+    limitUsd: 1, callLimit, attemptedCalls: rows.length,
     completedCalls: completed.length,
     uncertainCalls, reviewedUncertainCalls, unreviewedUncertainCalls: uncertainCalls - reviewedUncertainCalls,
     estimatedCostUsd, reservedUsd,
@@ -67,6 +74,10 @@ export function inferenceBudget(rows) {
 export function readInferenceBudget(databasePath) {
   if (!existsSync(databasePath)) return inferenceBudget([]);
   const db = new DatabaseSync(databasePath, { readOnly: true });
-  try { return inferenceBudget(db.prepare('SELECT * FROM inference ORDER BY rowid').all()); }
+  try {
+    const hasAuthorizations = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'inference_authorizations'").get();
+    const authorizations = hasAuthorizations ? db.prepare('SELECT * FROM inference_authorizations ORDER BY rowid').all() : [];
+    return inferenceBudget(db.prepare('SELECT * FROM inference ORDER BY rowid').all(), authorizations);
+  }
   finally { db.close(); }
 }

@@ -46,7 +46,7 @@ export function createBedrockModel(store, { send, resolveCredentials, ratesFetch
     async availability() {
       const budget = store.budget();
       if (budget.unreviewedUncertainCalls) return { available: false, code: 'usage_uncertain', message: 'A provider attempt has unreviewed usage. Review the retained receipt and establish a conservative budget hold before another call.' };
-      if (budget.attemptedCalls >= budget.callLimit || budget.remainingUsd <= 0) return { available: false, code: 'budget_exhausted', message: 'The authorized 20-call / $1 inference test limit has been reached.' };
+      if (budget.attemptedCalls >= budget.callLimit || budget.remainingUsd <= 0) return { available: false, code: 'budget_exhausted', message: `The authorized ${budget.callLimit}-call / $1 inference test limit has been reached.` };
       try { await credentials(); }
       catch { return { available: false, code: 'aws_credentials_unavailable', message: 'The projects-amazon AWS sign-in is unavailable or expired. Refresh that profile, then recheck the connection.' }; }
       return { available: true, message: 'Amazon Bedrock · Nova Micro', profile: AWS_PROFILE, region: AWS_REGION, modelId: MODEL_ID };

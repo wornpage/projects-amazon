@@ -1,6 +1,6 @@
 # Implementation and verification audit
 
-Reviewed September 30, 2026, America/New_York. The app is a local Alexa+ simulation with actual Bedrock conversation, three MCP tools, and human-confirmed work decisions. Publication, video recording and Devpost submission remain review steps.
+Reviewed October 1, 2026, America/New_York. The app is a local Alexa+ simulation with actual Bedrock conversation, three MCP tools, and human-confirmed work decisions. Publication, video recording and Devpost submission remain review steps.
 
 ## Evidence
 
@@ -19,11 +19,11 @@ Reviewed September 30, 2026, America/New_York. The app is a local Alexa+ simulat
 | Briefing → proposal → confirmation → refresh → updated briefing | Retained actual Bedrock continuation and persisted SQLite state | Verified live |
 | Restart persistence and isolated demo sessions | Actual process-restart tests; live confirmed decision survives subsequent servers | Verified locally; restart also live |
 | Test fixtures only in automated tests; clear provider failures | No production stub switch; unavailable-state tests and retained denied call | Verified locally and live |
-| One bounded live batch, ≤20 attempts, ≤800 output tokens, ≤24 KB input, no SDK retries | Shared persisted ledger across all continuations; 19 attempts | Verified |
-| $1 cap, current prices, retained failures, fail on unreviewed uncertainty | 54-test suite; actual receipts; original denial kept with reviewed $0.03 hold | Verified within retained bound; actual AWS bill unknown |
+| Initial 20-call batch and explicitly authorized extension to 30, ≤800 output tokens, ≤24 KB input, no SDK retries | Shared persisted ledger across all continuations; 29 attempts | Verified |
+| $1 cap, current prices, retained failures, fail on unreviewed uncertainty | 55-test suite; actual receipts; original denial kept with reviewed $0.03 hold | Verified within retained bound; actual AWS bill unknown |
 | Setup, demo script, submission/tool-feedback drafts, MIT source preparation | README, docs, license and public dependency notices | Prepared for review |
 
-The build and **54 automated tests pass**. Automated conversation responses use a fixture; they do not measure model reliability. The suite prevents starting a conversation with only one provider call remaining, because the mandatory fresh read leaves no allowance for a reply.
+The build and **55 automated tests pass**. Automated conversation responses use a fixture; they do not measure model reliability. The suite prevents starting a conversation with only one provider call remaining, because the mandatory fresh read leaves no allowance for a reply.
 
 ## Live evidence and retained failures
 
@@ -71,7 +71,7 @@ The build and 54 tests pass after adding failed-send draft recovery, browser-own
 
 An ignored database backup was saved before the local demo-group migration. Drafts retained while switching are page-local; clearing cookies removes browser access to retained demos. The model's MCP permissions remain limited to the active workspace and do not include browsing or switching demos. Inference limits and receipts remain shared across every workspace. No live provider calls were made for this pass; ordinary-language model tool selection still needs a fresh bounded validation allowance.
 
-## Budget at the validation checkpoint
+## Historical budget at the September 30 validation checkpoint
 
 | Measure | Value | Meaning |
 |---|---:|---|
@@ -85,6 +85,27 @@ An ignored database backup was saved before the local demo-group migration. Draf
 Verified rates were $0.035 per million input tokens and $0.14 per million output tokens. [AWS regional price list](https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonBedrock/current/us-east-1/index.json).
 
 The denied receipt remains `uncertain`. Its operator review holds a full documented context in both directions at the higher historical/current rates, rounded up to a cent. The review retains the original receipt hash, original reservation, pricing sources and reason. It cannot reset call counts, change actual unknown usage to zero, or authorize an unaffordable retry. Any new unreviewed uncertainty stops inference. Future requests reserve the full 131,072-token input ceiling plus 800 output tokens. [Model limits](https://docs.aws.amazon.com/en_en/bedrock/latest/userguide/model-card-amazon-nova-micro.html).
+
+## October 1 live correction and current budget
+
+The owner explicitly approved raising the cumulative call ceiling from 20 to 30 while keeping the $1 cap. A local operator action retained this authorization in `inference_authorizations`; it preserves all prior attempts and cost holds and has no browser or MCP endpoint. Tests cover restart persistence, rejection of reset/repeated extensions, the maximum 30 ceiling, and refusal of the next dispatch at exhaustion.
+
+The first new live check successfully proposed an ordinary-language owner change and cancelled it without changing work. It then failed because Nova supplied `client portal` instead of `client-portal` as an item ID. This failed report remains `data/live-companion-check-2026-10-01T23-32-13.600Z.json`.
+
+Both item tools now enumerate the exact workspace IDs in their MCP schema. The same ordinary-language client-portal request then created a real review card. Confirmation saved the exact displayed next action; refresh and a subsequent actual Bedrock briefing read it back. New-demo creation and Saved demos switching restored its decision/history. An identical direct MCP request reused the model-created card without extra inference. Duplicate ordinary-language requests were not revalidated live.
+
+The passing report is `data/live-companion-correction-2026-10-01T23-36-48.295Z.json`, with matching receipts and a SHA link to the earlier owner/cancellation evidence. Its screenshot is `output/review/live-companion-correction-2026-10-01T23-36-48.295Z/saved-live-demo.png`. These prove the specific demonstrated flows, not a general reliability rate. The earlier local-only evidence above remains historical.
+
+| Measure | Current value | Meaning |
+|---|---:|---|
+| Attempted calls | 29 / 30 | Includes all failures and prior continuations |
+| Calls with usable usage | 28 | Returned token counts |
+| Estimated token cost | $0.001918455 | Not an AWS billing statement |
+| Original denied call hold | $0.03 | Actual usage still unknown |
+| Remaining dollar allowance | $0.968081545 | $1 less estimates and hold |
+| Remaining calls | 1 | Insufficient for a conversation; inference stopped |
+
+Current regional rates were reverified from the official AWS price list: $0.035 per million input tokens and $0.14 per million output tokens. The correction used four calls; the total new validation used ten. Every failed receipt is retained. Browsing saved decisions makes zero inference calls.
 
 ## Challenge delivery
 

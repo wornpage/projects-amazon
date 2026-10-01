@@ -1,6 +1,6 @@
 # Demonstration script — target 2 minutes 40 seconds
 
-The live workflow is validated; review `verification.md` and the retained screenshots first. A fresh recording needs a separately authorized inference allowance because the current 20-call batch has only one call left. Record the real Bedrock runtime in a fresh fictional workspace. Keep the simulation label visible. Do not show AWS authorization codes, credentials or private account pages.
+The live workflow is validated; review `verification.md` and the retained screenshots first. A fresh recording needs a separately authorized inference allowance because 29 of the approved 30 total calls have been used. Record the real Bedrock runtime in a fresh fictional workspace. Keep the simulation label visible. Do not show AWS authorization codes, credentials or private account pages.
 
 | Time | On screen | Narration |
 |---|---|---|

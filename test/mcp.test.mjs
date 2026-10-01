@@ -65,6 +65,14 @@ test('malformed tool inputs and hidden confirmation tools cannot change work', a
     const unavailable = await client.callTool({ name: 'confirm_action', arguments: {} });
     assert.equal(unavailable.isError, true);
     assert.equal(runtime.store.history(session.workspace.sessionId).length, 0);
+    const tools = (await client.listTools()).tools;
+    for (const name of ['get_work_item', 'propose_next_action']) {
+      const schema = tools.find(tool => tool.name === name).inputSchema.properties.itemId;
+      assert.ok(schema.enum.includes('client-portal'));
+      assert.equal(schema.enum.includes('client portal'), false);
+    }
+    const invalidId = await client.callTool({ name: 'get_work_item', arguments: { itemId: 'client portal' } });
+    assert.equal(invalidId.isError, true);
   } finally { await client.close(); }
 });
 test('MCP rejects missing auth, malicious origin and unsupported protocol headers', async () => {

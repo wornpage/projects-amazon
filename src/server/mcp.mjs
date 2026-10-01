@@ -14,6 +14,8 @@ const guarded = fn => async input => {
 
 export function createMcpServer(store, sessionId) {
   const server = new McpServer({ name: 'projects-briefing', version: '0.1.0' });
+  const itemId = z.enum(store.briefing(sessionId).items.map(item => item.id))
+    .describe('Exact id returned by get_briefing, such as client-portal or sign-in. Never use a title or a spaced name.');
   server.registerTool('get_briefing', {
     description: 'Read the six demo work items, current workspace revision, pending proposals, and recent decision summaries. Read before proposing a change. Describing a change does not create a pending proposal.',
     inputSchema: z.strictObject({}),
@@ -27,12 +29,12 @@ export function createMcpServer(store, sessionId) {
   }));
   server.registerTool('get_work_item', {
     description: 'Inspect one work item and its saved decision history.',
-    inputSchema: z.strictObject({ itemId: z.string().min(1).max(80) }),
+    inputSchema: z.strictObject({ itemId }),
     annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false }
   }, guarded(input => store.getWorkItem(sessionId, input.itemId)));
   server.registerTool('propose_next_action', {
     description: 'Save a proposal to change an open item owner, blocker, or nextAction. Identical pending proposals are reused. Supply sourceRevision from a fresh read. This never changes the item; only the human can confirm through the browser. Empty blocker means no recorded blocker. Status and completion cannot be changed.',
-    inputSchema: proposalSchema,
+    inputSchema: proposalSchema.extend({ itemId }),
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false }
   }, guarded(input => store.propose(sessionId, input)));
   return server;
