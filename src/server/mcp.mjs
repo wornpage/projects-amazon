@@ -31,7 +31,7 @@ export function createMcpServer(store, sessionId) {
     annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false }
   }, guarded(input => store.getWorkItem(sessionId, input.itemId)));
   server.registerTool('propose_next_action', {
-    description: 'Save a proposal to change an open item owner, blocker, or nextAction. Supply sourceRevision from a fresh read. This never changes the item; only the human can confirm through the browser. Empty blocker means no recorded blocker. Status and completion cannot be changed.',
+    description: 'Save a proposal to change an open item owner, blocker, or nextAction. Identical pending proposals are reused. Supply sourceRevision from a fresh read. This never changes the item; only the human can confirm through the browser. Empty blocker means no recorded blocker. Status and completion cannot be changed.',
     inputSchema: proposalSchema,
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false }
   }, guarded(input => store.propose(sessionId, input)));

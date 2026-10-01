@@ -1,5 +1,5 @@
 <script>
-  import { onMount } from 'svelte';
+  import { onMount, tick } from 'svelte';
   import { Button, IconButton } from '@wornpage/button';
   import { Textarea } from '@wornpage/form-fields';
   import { Accordion, Collapsible } from '@wornpage/disclosure';
@@ -15,6 +15,20 @@
   let notice = $state('');
   let view = $state('work');
   let expanded = $state(null);
+  const drafts = new Map();
+  let conversationBody = $state(null);
+  let followConversation = $state(true);
+  let shownSession;
+  let shownMessages = 0;
+  $effect(() => {
+    const sessionId = workspace?.sessionId;
+    const count = workspace?.messages.length ?? 0;
+    if (conversationBody && (shownSession !== sessionId || shownMessages !== count)) {
+      const follow = shownSession !== sessionId || followConversation;
+      shownSession = sessionId; shownMessages = count;
+      if (follow) void tick().then(() => { if (conversationBody) conversationBody.scrollTop = conversationBody.scrollHeight; });
+    }
+  });
   const pending = $derived(workspace?.proposals.filter(value => value.status === 'pending') ?? []);
   const tabs = $derived([
     { id: 'work', label: `Work items (${workspace?.counts.total ?? 0})` },
@@ -56,9 +70,9 @@
   }
   async function send(text = message) {
     if (!text.trim() || busy || !workspace?.model.available) return;
-    busy = true; error = ''; notice = ''; message = '';
-    try { workspace = (await request('/api/chat', { message: text })).workspace; }
-    catch (failure) { error = failure.message; await refresh(); }
+    busy = true; error = ''; notice = '';
+    try { workspace = (await request('/api/chat', { message: text })).workspace; message = ''; }
+    catch (failure) { message = text; error = failure.message; await refresh(); }
     finally { busy = false; }
   }
   async function decide(proposal, action) {
@@ -72,8 +86,20 @@
   }
   async function newWorkspace() {
     busy = true; error = ''; notice = '';
-    try { workspace = (await request('/api/session/new', {})).workspace; expanded = null; view = 'work'; notice = 'A fresh demo workspace is ready. Your previous workspace is retained.'; }
-    catch (failure) { error = failure.message; }
+    drafts.set(workspace.sessionId, message);
+    try { workspace = (await request('/api/session/new', {})).workspace; message = ''; expanded = null; view = 'work'; notice = 'A fresh demo is ready. Return to earlier work using Saved demos.'; }
+    catch (failure) { error = failure.message; await refresh(); message = drafts.get(workspace.sessionId) ?? ''; }
+    finally { busy = false; }
+  }
+  async function switchWorkspace(sessionId) {
+    if (sessionId === workspace.sessionId || busy) return;
+    drafts.set(workspace.sessionId, message);
+    busy = true; error = ''; notice = '';
+    try {
+      workspace = (await request('/api/session/switch', { sessionId })).workspace;
+      message = drafts.get(workspace.sessionId) ?? ''; expanded = null; view = 'work';
+      notice = 'Saved demo restored, including its work and decisions.';
+    } catch (failure) { error = failure.message; await refresh(); message = drafts.get(workspace.sessionId) ?? ''; }
     finally { busy = false; }
   }
   function composerKey(event) {
@@ -111,7 +137,7 @@
       <div class="main-grid">
         <section class="conversation-panel panel" aria-labelledby="conversation-title">
           <div class="panel-heading"><div><span class="section-kicker">YOUR WORK COMPANION</span><h2 id="conversation-title">Let’s find the next move.</h2></div><span class="companion-symbol" aria-hidden="true">✳</span></div>
-          <div class="conversation-body" aria-live="polite" aria-busy={busy}>
+          <div class="conversation-body" bind:this={conversationBody} onscroll={() => followConversation = conversationBody.scrollHeight - conversationBody.scrollTop - conversationBody.clientHeight < 48} aria-live="polite" aria-busy={busy}>
             {#if workspace.messages.length === 0}
               <div class="welcome-message"><span class="avatar" aria-hidden="true">✳</span><div><strong>Start with the work you have.</strong><p>I can read the board, explain a blocker, and propose a change for you to review. You decide what gets saved.</p></div></div>
               <div class="starter-questions"><span>TRY ASKING</span>{#each prompts as prompt}<Button class="starter-button" onclick={() => send(prompt)} disabled={busy || !workspace.model.available}>{prompt}<span aria-hidden="true">↗</span></Button>{/each}</div>
@@ -130,7 +156,7 @@
             {/if}
             {#if busy}<div class="thinking" role="status"><span></span><span></span><span></span><p>Working through the request…</p></div>{/if}
           </div>
-          {#if !workspace.model.available}<div class="connection-notice-banner"><Alert tone="warning" title="Conversation is unavailable"><p>{workspace.model.message}</p><Button class="recheck-button" onclick={refresh} disabled={busy}>Recheck connection</Button></Alert></div>{/if}
+          {#if !workspace.model.available}<div class="connection-notice-banner"><Alert tone="warning" title="Conversation is unavailable"><p>{workspace.model.message}</p>{#if workspace.budget.callLimit - workspace.budget.attemptedCalls < 2}<p>Remaining provider calls in the test allowance: {workspace.budget.callLimit - workspace.budget.attemptedCalls}. A conversation needs at least two.</p>{/if}<Button class="recheck-button" onclick={refresh} disabled={busy}>Recheck connection</Button></Alert></div>{/if}
           <form class="composer" onsubmit={event => { event.preventDefault(); void send(); }}>
             <label for="message">Message your work companion</label><Textarea id="message" bind:value={message} onkeydown={composerKey} maxlength="1500" rows={2} spellcheck placeholder="What can we move forward today?" disabled={busy || !workspace.model.available} />
             <div class="composer-bottom"><span>Changes wait for your confirmation.</span><Button variant="primary" type="submit" disabled={busy || !workspace.model.available || !message.trim()} aria-label="Send message">Send <span aria-hidden="true">↑</span></Button></div>
@@ -140,6 +166,7 @@
 
         <section class="work-panel" aria-labelledby="work-title">
           <div class="work-heading"><div><span class="section-kicker">STUDIO LAUNCH</span><h2 id="work-title">The work on your plate.</h2></div><Button onclick={newWorkspace} disabled={busy}>New demo <span aria-hidden="true">↗</span></Button></div>
+          <div class="demo-picker"><label for="saved-demos">Saved demos</label><select id="saved-demos" value={workspace.sessionId} onchange={async event => { const select = event.currentTarget; await switchWorkspace(select.value); select.value = workspace.sessionId; }} disabled={busy}>{#each workspace.demos as demo}<option value={demo.id}>{demo.label} · revision {demo.revision}</option>{/each}</select><span>Available to this browser.</span></div>
           <div class="view-tabs"><Tabs id="workspace" label="Workspace views" {tabs} bind:active={view} /></div>
           {#each pending as proposed (proposed.id)}
             <article class="proposal-card" data-testid="proposal-card" aria-labelledby={`proposal-${proposed.id}`}>

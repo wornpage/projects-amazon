@@ -18,7 +18,9 @@ npm start
 
 Open **http://127.0.0.1:4317**. Use `npm run dev` for development; the frontend opens at http://127.0.0.1:5173 and proxies to the same backend.
 
-The six fictional work items, proposals, conversation messages and confirmed decisions persist in `data/briefing.sqlite`. Each browser session has its own workspace. **New demo** starts a new workspace and retains the previous one. Fonts and assets are bundled locally.
+The six fictional work items, proposals, conversation messages and confirmed decisions persist in `data/briefing.sqlite`. **New demo** starts a workspace; **Saved demos** returns to earlier demos created from the same browser session, including their decisions and history. Other browser sessions cannot list or switch to those demos. Keep the browser cookie to retain access: this does not recover demos after clearing cookies or expose unrelated historical workspaces. Existing databases migrate each old workspace into its own browser-owned group. Fonts and assets are bundled locally.
+
+Failed sends keep the message in the composer for an explicit retry. Drafts also survive switching between demos while the page stays open; they are not persisted across a full page reload. New replies follow the conversation when you are at the bottom and leave your position intact while you read older messages.
 
 ## Wornpage interface
 
@@ -63,7 +65,7 @@ npm run mcp:session
 
 This creates a new fictional workspace and prints its MCP bearer token and the three tools: `get_briefing`, `get_work_item`, and `propose_next_action`. The token is not an AWS credential and cannot authenticate the browser confirmation endpoint. The human browser cookie is separate and HttpOnly.
 
-The Bedrock conversation executes real MCP tool calls. Each turn forces a fresh `get_briefing` call, including pending proposals and recent decision summaries, before allowing other tool choices. A successful proposal tool result produces the app's concise review message immediately; no extra model call is used to restate it. A proposal records exact changed fields and the observed revision. Only a browser-confirmed action changes an item; stale proposals fail, duplicate confirmation applies once, and cancellation leaves the item unchanged. Updating a next action does not mark completion. Decision history retains the before/after values.
+The Bedrock conversation executes real MCP tool calls. Each turn forces a fresh `get_briefing` call, including pending proposals and recent decision summaries, before allowing other tool choices. A successful proposal tool result produces the app's concise review message immediately; no extra model call is used to restate it. Repeating an identical pending proposal for the same item and revision reuses its existing card; cancelled proposals remain recorded and can be proposed anew. A proposal records exact changed fields and the observed revision. Only a browser-confirmed action changes an item; stale proposals fail, duplicate confirmation applies once, and cancellation leaves the item unchanged. Updating a next action does not mark completion. Decision history retains the before/after values.
 
 Each assistant turn displays proposal evidence from the stored tool result and current proposal status. Prose alone shows **No proposal created in this turn**. Existing chat entries update to confirmed, cancelled or stale as appropriate. Nova planning sections are omitted from visible replies and subsequent model text history; previously retained message records are preserved.
 
@@ -86,7 +88,7 @@ A locally reviewed `AccessDeniedException` can receive a conservative cost hold 
 
 ## Current verification
 
-The production build and **46 automated tests pass**, including the complete browser confirmation journey, persistence through an actual Node server restart, isolated sessions, malformed MCP calls, protocol negotiation, stale proposals, double clicks, cancellation, owner/blocker changes, keyboard interaction, proposal-status evidence, planning-text handling, and retained-budget enforcement. Automated conversation tests use an explicitly injected model fixture. See [verification.md](docs/verification.md) for the full evidence and limitations.
+The production build and **54 automated tests pass**, including the complete browser confirmation journey, persistence through an actual Node server restart, isolated sessions, malformed MCP calls, protocol negotiation, stale proposals, double clicks, cancellation, owner/blocker changes, keyboard interaction, proposal-status evidence, planning-text handling, and retained-budget enforcement. Automated conversation tests use an explicitly injected model fixture. See [verification.md](docs/verification.md) for the full evidence and limitations.
 
 On September 30, 2026, the actual Bedrock → MCP → browser journey passed: read a briefing, propose a client-portal next action, confirm exactly the displayed text, refresh, and read the saved action in a subsequent live briefing. A real owner-change proposal was also cancelled without changing the item or revision. This continuation preserves the original denied call and every intervening failed check.
 

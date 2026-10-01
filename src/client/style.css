@@ -103,6 +103,8 @@ h2 { font-family: 'Manrope Variable', system-ui, sans-serif; font-size: 18px; li
 .message-meta time { font-size: 10px; color: var(--muted); margin-left: auto; }
 .chat-message p { white-space: pre-wrap; overflow-wrap: anywhere; color: #52634e; }
 .message-evidence { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; color: var(--muted); font-size: 11px; }
+.demo-picker { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 12px 0; font-size: 11px; color: var(--muted); }
+.demo-picker select { min-width: 0; max-width: 100%; padding: 8px; border: 1px solid var(--line); border-radius: 6px; background: white; color: inherit; font: inherit; }
 .tool-trace { margin-top: 12px; font-size: 11px; color: #52634e; }
 .tool-trace ol { padding-left: 16px; line-height: 1.8; margin: 0; }
 .tool-trace li span { display: block; }

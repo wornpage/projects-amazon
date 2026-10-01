@@ -20,10 +20,10 @@ Reviewed September 30, 2026, America/New_York. The app is a local Alexa+ simulat
 | Restart persistence and isolated demo sessions | Actual process-restart tests; live confirmed decision survives subsequent servers | Verified locally; restart also live |
 | Test fixtures only in automated tests; clear provider failures | No production stub switch; unavailable-state tests and retained denied call | Verified locally and live |
 | One bounded live batch, ≤20 attempts, ≤800 output tokens, ≤24 KB input, no SDK retries | Shared persisted ledger across all continuations; 19 attempts | Verified |
-| $1 cap, current prices, retained failures, fail on unreviewed uncertainty | 46-test suite; actual receipts; original denial kept with reviewed $0.03 hold | Verified within retained bound; actual AWS bill unknown |
+| $1 cap, current prices, retained failures, fail on unreviewed uncertainty | 54-test suite; actual receipts; original denial kept with reviewed $0.03 hold | Verified within retained bound; actual AWS bill unknown |
 | Setup, demo script, submission/tool-feedback drafts, MIT source preparation | README, docs, license and public dependency notices | Prepared for review |
 
-The build and **46 automated tests pass**. Automated conversation responses use a fixture; they do not measure model reliability. The suite prevents starting a conversation with only one provider call remaining, because the mandatory fresh read leaves no allowance for a reply.
+The build and **54 automated tests pass**. Automated conversation responses use a fixture; they do not measure model reliability. The suite prevents starting a conversation with only one provider call remaining, because the mandatory fresh read leaves no allowance for a reply.
 
 ## Live evidence and retained failures
 
@@ -64,6 +64,12 @@ No further provider calls were made for these changes:
 The build and local/browser regressions pass. These checks do not establish improved natural-language tool selection against Nova; that needs a separately authorized live allowance. Plain-text briefing replies may still contain Markdown markers.
 
 The previously saved actual Bedrock session was also opened with the new interface on desktop and mobile. Confirmed/cancelled labels, concise proposal text, hidden planning sections and the original saved decision were verified with zero inference calls. That read-only receipt is `output/review/saved-live-history-refinement-v2.json`; it is display/persistence evidence, not a new model-validation run.
+
+## Local usability pass — October 1, 2026
+
+The build and 54 tests pass after adding failed-send draft recovery, browser-owned demo switching, duplicate pending-card reuse, and conversation scroll behavior. Tests cover explicit retry after a failed network send; restored decisions after switching and refresh; rejection of another browser's switch request; persistence of demo groups across restart; and migration of old sessions without exposing unrelated demos or altering their credentials. Cancelled proposals are retained and are not reused. Reading old chat is not interrupted by new replies.
+
+An ignored database backup was saved before the local demo-group migration. Drafts retained while switching are page-local; clearing cookies removes browser access to retained demos. The model's MCP permissions remain limited to the active workspace and do not include browsing or switching demos. Inference limits and receipts remain shared across every workspace. No live provider calls were made for this pass; ordinary-language model tool selection still needs a fresh bounded validation allowance.
 
 ## Budget at the validation checkpoint
 

@@ -35,6 +35,9 @@ export function createStore(databasePath = ':memory:') {
     CREATE TABLE IF NOT EXISTS messages (seq INTEGER PRIMARY KEY AUTOINCREMENT, session_id TEXT NOT NULL REFERENCES sessions(id), role TEXT NOT NULL CHECK(role IN ('user','assistant','notice')), text TEXT NOT NULL, trace TEXT NOT NULL, created_at TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS inference (id TEXT PRIMARY KEY, status TEXT NOT NULL CHECK(status IN ('reserved','complete','uncertain')), reserved_usd REAL NOT NULL, actual_usd REAL, receipt TEXT NOT NULL, created_at TEXT NOT NULL);
   `);
+  if (!db.prepare('PRAGMA table_info(sessions)').all().some(column => column.name === 'browser_root')) {
+    db.exec('BEGIN IMMEDIATE; ALTER TABLE sessions ADD COLUMN browser_root TEXT; UPDATE sessions SET browser_root = id; COMMIT;');
+  }
   // A process restart cannot establish the outcome of an interrupted provider call.
   db.prepare("UPDATE inference SET status = 'uncertain' WHERE status = 'reserved'").run();
 
@@ -65,12 +68,21 @@ export function createStore(databasePath = ':memory:') {
     hasSession: id => Boolean(db.prepare('SELECT id FROM sessions WHERE id = ?').get(id)),
     browserToken: id => session(id).browser_token,
     sessionForBrowserToken: token => db.prepare('SELECT id FROM sessions WHERE browser_token = ?').get(token)?.id,
-    createSession: () => atomic(() => {
+    createSession: parentSessionId => atomic(() => {
       const id = randomUUID();
-      db.prepare('INSERT INTO sessions (id, browser_token, created_at) VALUES (?, ?, ?)').run(id, randomBytes(32).toString('hex'), new Date().toISOString());
+      const root = parentSessionId === undefined ? id : session(parentSessionId).browser_root;
+      db.prepare('INSERT INTO sessions (id, browser_token, created_at, browser_root) VALUES (?, ?, ?, ?)').run(id, randomBytes(32).toString('hex'), new Date().toISOString(), root);
       for (const value of SEED_ITEMS) db.prepare('INSERT INTO items VALUES (?, ?, ?)').run(id, value.id, JSON.stringify(value));
       return id;
     }),
+    browserSessions: sessionId => db.prepare('SELECT id, revision, created_at FROM sessions WHERE browser_root = ? ORDER BY rowid').all(session(sessionId).browser_root)
+      .map((row, index) => ({ id: row.id, label: `Demo ${index + 1}`, revision: row.revision, createdAt: row.created_at })),
+    switchBrowserSession: (currentId, targetId) => {
+      const current = session(currentId);
+      const target = db.prepare('SELECT * FROM sessions WHERE id = ? AND browser_root = ?').get(targetId, current.browser_root);
+      if (!target) throw new AppError('demo_not_owned', 'Choose a demo created by this browser.', 403);
+      return target.id;
+    },
     briefing: sessionId => {
       const current = session(sessionId);
       const items = db.prepare('SELECT data FROM items WHERE session_id = ? ORDER BY rowid').all(sessionId).map(row => JSON.parse(row.data));
@@ -92,6 +104,10 @@ export function createStore(databasePath = ':memory:') {
       const original = item(sessionId, parsed.itemId);
       if (original.status === 'done') throw new AppError('item_completed', 'This item is already complete. Choose an open item.');
       if (!Object.entries(parsed.changes).some(([key, value]) => original[key] !== value)) throw new AppError('no_change', 'The proposed values are already current.');
+      const canonical = value => JSON.stringify(Object.entries(value).sort(([a], [b]) => a.localeCompare(b)));
+      const matching = db.prepare("SELECT * FROM proposals WHERE session_id = ? AND item_id = ? AND source_revision = ? AND status = 'pending'").all(sessionId, parsed.itemId, parsed.sourceRevision)
+        .find(row => canonical(JSON.parse(row.changes)) === canonical(parsed.changes));
+      if (matching) return toProposal(matching);
       const id = randomUUID();
       db.prepare("INSERT INTO proposals VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, NULL)").run(id, sessionId, parsed.itemId, parsed.sourceRevision, JSON.stringify(parsed.changes), JSON.stringify(original), new Date().toISOString());
       return proposal(sessionId, id);

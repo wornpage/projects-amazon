@@ -109,6 +109,110 @@ test('browser: cancellation leaves the item and revision unchanged', async () =>
   await context.close();
 });
 
+test('browser: a failed send keeps its draft and retries only after an explicit click', async () => {
+  const { context, page } = await newPage();
+  try {
+    let attempts = 0;
+    await page.route('**/api/chat', route => { attempts++; return route.abort('failed'); });
+    const draft = 'Propose updating the client portal next action.';
+    await chat(page, draft);
+    await page.getByText('Request unavailable', { exact: true }).waitFor();
+    assert.equal(await page.getByLabel('Message your work companion').inputValue(), draft);
+    assert.equal(attempts, 1);
+    assert.equal(await page.getByTestId('proposal-card').count(), 0);
+    await page.unroute('**/api/chat');
+    await page.getByRole('button', { name: 'Send message', exact: true }).click();
+    await page.getByRole('button', { name: /Confirm action/ }).waitFor();
+    assert.equal(await page.getByLabel('Message your work companion').inputValue(), '');
+  } finally { await context.close(); }
+});
+
+test('browser: returning to an earlier demo restores decisions and its in-page draft after a fresh demo', async () => {
+  const { context, page } = await newPage();
+  try {
+    const first = await (await page.request.get(`${runtime.origin}/api/workspace`)).json();
+    await chat(page, 'Propose updating the client portal next action.');
+    await page.getByRole('button', { name: /Confirm action/ }).click();
+    await page.getByText('Decision saved. The work item now shows your confirmed change.').waitFor();
+    await page.getByLabel('Message your work companion').fill('Keep my next question here.');
+    await page.getByRole('button', { name: /New demo/ }).click();
+    await page.getByText('A fresh demo is ready. Return to earlier work using Saved demos.').waitFor();
+    assert.match(await page.getByTestId('item-client-portal').innerText(), /final welcome copy/);
+    await page.getByLabel('Saved demos').selectOption(first.sessionId);
+    await page.getByText('Saved demo restored, including its work and decisions.').waitFor();
+    assert.equal(await page.getByLabel('Message your work companion').inputValue(), 'Keep my next question here.');
+    assert.match(await page.getByTestId('item-client-portal').innerText(), /approved welcome copy tomorrow/);
+    await page.reload();
+    await page.getByRole('tab', { name: 'Decisions (1)', exact: true }).click();
+    assert.match(await page.getByRole('tabpanel', { name: 'Decisions (1)', exact: true }).innerText(), /approved welcome copy tomorrow/);
+    const other = await newPage();
+    const isolated = await (await other.page.request.get(`${runtime.origin}/api/workspace`)).json();
+    assert.equal(isolated.demos.length, 1);
+    assert.notEqual(isolated.demos[0].id, first.sessionId);
+    const forbidden = await other.page.request.post(`${runtime.origin}/api/session/switch`, { headers: { Origin: runtime.origin, 'X-Demo-Session': isolated.sessionId }, data: { sessionId: first.sessionId } });
+    assert.equal(forbidden.status(), 403);
+    await other.context.close();
+    await page.screenshot({ path: resolve(output, 'automated-test-demo-restored.png'), fullPage: true });
+  } finally { await context.close(); }
+});
+
+test('browser: repeated proposal requests retain one pending card and one confirmed decision', async () => {
+  const { context, page } = await newPage();
+  try {
+    await chat(page, 'Propose updating the client portal next action.');
+    await page.getByRole('button', { name: /Confirm action/ }).waitFor();
+    const first = await (await page.request.get(`${runtime.origin}/api/workspace`)).json();
+    await chat(page, 'Propose updating the client portal next action.');
+    await page.locator('.chat-message').nth(3).waitFor();
+    const repeated = await (await page.request.get(`${runtime.origin}/api/workspace`)).json();
+    assert.equal(repeated.proposals.length, 1);
+    assert.equal(repeated.proposals[0].id, first.proposals[0].id);
+    assert.equal(await page.getByTestId('proposal-card').count(), 1);
+    await page.getByRole('button', { name: /Confirm action/ }).click();
+    await page.getByText('Decision saved. The work item now shows your confirmed change.').waitFor();
+    const saved = await (await page.request.get(`${runtime.origin}/api/workspace`)).json();
+    assert.equal(saved.history.length, 1);
+  } finally { await context.close(); }
+});
+
+test('browser: failed demo switching restores the actual selected demo and keeps its draft', async () => {
+  const { context, page } = await newPage();
+  try {
+    const first = await (await page.request.get(`${runtime.origin}/api/workspace`)).json();
+    await page.getByRole('button', { name: /New demo/ }).click();
+    await page.getByText('A fresh demo is ready. Return to earlier work using Saved demos.').waitFor();
+    const current = await (await page.request.get(`${runtime.origin}/api/workspace`)).json();
+    await page.getByLabel('Message your work companion').fill('Draft for the current demo.');
+    await page.route('**/api/session/switch', route => route.abort('failed'));
+    await page.getByLabel('Saved demos').selectOption(first.sessionId);
+    await page.getByText('Request unavailable', { exact: true }).waitFor();
+    await page.waitForFunction(id => document.querySelector('#saved-demos').value === id, current.sessionId);
+    assert.equal(await page.getByLabel('Message your work companion').inputValue(), 'Draft for the current demo.');
+    assert.equal((await (await page.request.get(`${runtime.origin}/api/workspace`)).json()).sessionId, current.sessionId);
+  } finally { await context.close(); }
+});
+
+test('browser: new replies follow the bottom but do not pull a reader away from older messages', async () => {
+  const { context, page } = await newPage();
+  try {
+    const workspace = await (await page.request.get(`${runtime.origin}/api/workspace`)).json();
+    for (let index = 0; index < 20; index++) runtime.store.addMessage(workspace.sessionId, 'assistant', `Earlier briefing ${index}. ` + 'A work-item detail. '.repeat(20));
+    await page.getByRole('button', { name: 'Refresh workspace', exact: true }).click();
+    await page.waitForFunction(() => { const body = document.querySelector('.conversation-body'); return body.scrollHeight - body.clientHeight - body.scrollTop < 10; });
+    await page.locator('.conversation-body').evaluate(element => element.scrollTop = 0);
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    runtime.store.addMessage(workspace.sessionId, 'assistant', 'A new reply while reading older messages.');
+    await page.getByRole('button', { name: 'Refresh workspace', exact: true }).click();
+    await page.getByText('A new reply while reading older messages.', { exact: true }).waitFor();
+    assert.ok(await page.locator('.conversation-body').evaluate(element => element.scrollTop < 10));
+    await page.locator('.conversation-body').evaluate(element => element.scrollTop = element.scrollHeight);
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    runtime.store.addMessage(workspace.sessionId, 'assistant', 'A new reply at the bottom.');
+    await page.getByRole('button', { name: 'Refresh workspace', exact: true }).click();
+    await page.waitForFunction(() => { const body = document.querySelector('.conversation-body'); return body.scrollHeight - body.clientHeight - body.scrollTop < 10; });
+  } finally { await context.close(); }
+});
+
 test('browser: prose without a tool result cannot present a proposal, and planning text is hidden', async () => {
   const { context, page } = await newPage();
   try {

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { join } from 'node:path';
 import { createStore } from '../src/server/store.mjs';
 import { temporaryDirectory } from './helpers.mjs';
+import { DatabaseSync } from 'node:sqlite';
 
 const changes = { nextAction: 'Review the approved welcome copy with Jordan.' };
 test('six seeded items have explicit stable count denominators', () => {
@@ -87,4 +88,55 @@ test('the 20-call ceiling cannot be bypassed by new workspaces', () => {
   store.createSession();
   assert.throws(() => store.reserveInference(0.001, {}), error => error.code === 'budget_exhausted');
   assert.equal(store.budget().attemptedCalls, 20); store.close();
+});
+
+test('identical pending proposals reuse a card regardless of field order, but cancelled proposals are not reused', () => {
+  const store = createStore();
+  try {
+    const sessionId = store.createSession();
+    const first = store.propose(sessionId, { itemId: 'client-portal', sourceRevision: 1, changes: { owner: 'Morgan', blocker: '' } });
+    const repeated = store.propose(sessionId, { itemId: 'client-portal', sourceRevision: 1, changes: { blocker: '', owner: ' Morgan ' } });
+    assert.equal(repeated.id, first.id);
+    assert.equal(store.proposals(sessionId).length, 1);
+    assert.equal(store.briefing(sessionId).revision, 1);
+    store.cancel(sessionId, first.id);
+    const renewed = store.propose(sessionId, { itemId: 'client-portal', sourceRevision: 1, changes: { owner: 'Morgan', blocker: '' } });
+    assert.notEqual(renewed.id, first.id);
+    assert.equal(store.proposals(sessionId).length, 2);
+  } finally { store.close(); }
+});
+
+test('browser demo families survive restart, isolate unrelated sessions, and do not reset the budget', () => {
+  const temporary = temporaryDirectory(); const path = join(temporary.directory, 'families.sqlite');
+  let store = createStore(path);
+  try {
+    const first = store.createSession(); const second = store.createSession(first); const unrelated = store.createSession();
+    const call = store.reserveInference(.001, {}); store.finishInference(call, .0001, {});
+    const proposal = store.propose(first, { itemId: 'client-portal', sourceRevision: 1, changes });
+    store.confirm(first, proposal.id, 1);
+    store.close(); store = createStore(path);
+    assert.deepEqual(store.browserSessions(second).map(value => value.id), [first, second]);
+    assert.equal(store.switchBrowserSession(second, first), first);
+    assert.equal(store.briefing(first).revision, 2);
+    assert.throws(() => store.switchBrowserSession(unrelated, first), error => error.code === 'demo_not_owned');
+    assert.equal(store.browserSessions(unrelated).length, 1);
+    assert.equal(store.budget().attemptedCalls, 1);
+  } finally { store.close(); temporary.remove(); }
+});
+
+test('existing session schema migrates without grouping unrelated historical demos or changing credentials', () => {
+  const temporary = temporaryDirectory(); const path = join(temporary.directory, 'old.sqlite');
+  const old = new DatabaseSync(path);
+  old.exec('CREATE TABLE sessions (id TEXT PRIMARY KEY, browser_token TEXT NOT NULL UNIQUE, revision INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL)');
+  old.prepare('INSERT INTO sessions (id, browser_token, created_at) VALUES (?, ?, ?)').run('old-first', 'first-secret', '2026-09-30');
+  old.prepare('INSERT INTO sessions (id, browser_token, created_at) VALUES (?, ?, ?)').run('old-second', 'second-secret', '2026-09-30');
+  old.close();
+  const store = createStore(path);
+  try {
+    assert.equal(store.browserToken('old-first'), 'first-secret');
+    assert.equal(store.browserSessions('old-first').length, 1);
+    assert.throws(() => store.switchBrowserSession('old-first', 'old-second'), error => error.code === 'demo_not_owned');
+    const child = store.createSession('old-first');
+    assert.equal(store.switchBrowserSession(child, 'old-first'), 'old-first');
+  } finally { store.close(); temporary.remove(); }
 });

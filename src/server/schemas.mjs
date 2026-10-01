@@ -14,6 +14,7 @@ export const proposalSchema = z.strictObject({
 
 export const chatSchema = z.strictObject({ message: z.string().trim().min(1).max(1500) });
 export const decisionSchema = z.strictObject({ sourceRevision: z.number().int().positive() });
+export const switchSessionSchema = z.strictObject({ sessionId: z.uuid() });
 
 export function parseInput(schema, input) {
   const parsed = schema.safeParse(input);

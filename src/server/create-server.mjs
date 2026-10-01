@@ -6,7 +6,7 @@ import { createStore } from './store.mjs';
 import { createBedrockModel } from './model.mjs';
 import { createConversation } from './conversation.mjs';
 import { handleMcp } from './mcp.mjs';
-import { chatSchema, decisionSchema, parseInput } from './schemas.mjs';
+import { chatSchema, decisionSchema, switchSessionSchema, parseInput } from './schemas.mjs';
 import { AppError, publicError } from './errors.mjs';
 
 export async function startServer({ port = 4317, databasePath = resolve('data/briefing.sqlite'), modelFactory = createBedrockModel, staticDirectory = resolve('dist') } = {}) {
@@ -47,7 +47,7 @@ export async function startServer({ port = 4317, databasePath = resolve('data/br
     req.demoSession = sessionId;
     next();
   });
-  const snapshot = async sessionId => ({ ...store.briefing(sessionId), proposals: store.proposals(sessionId), history: store.history(sessionId), messages: store.messages(sessionId), model: await conversation.availability(), budget: store.budget() });
+  const snapshot = async sessionId => ({ ...store.briefing(sessionId), demos: store.browserSessions(sessionId), proposals: store.proposals(sessionId), history: store.history(sessionId), messages: store.messages(sessionId), model: await conversation.availability(), budget: store.budget() });
   app.get('/api/workspace', async (req, res) => res.json(await snapshot(req.demoSession)));
   app.post('/api/chat', async (req, res) => {
     const input = parseInput(chatSchema, req.body);
@@ -68,7 +68,14 @@ export async function startServer({ port = 4317, databasePath = resolve('data/br
   });
   app.post('/api/session/new', async (req, res) => {
     if (!req.body || Object.keys(req.body).length) throw new AppError('invalid_session', 'A new demo requires an empty JSON object.');
-    const sessionId = store.createSession();
+    const sessionId = store.createSession(req.demoSession);
+    res.cookie('pb_session', store.browserToken(sessionId), { httpOnly: true, sameSite: 'strict', maxAge: 7 * 86400000, path: '/' });
+    res.json({ workspace: await snapshot(sessionId) });
+  });
+  app.post('/api/session/switch', async (req, res) => {
+    const input = parseInput(switchSessionSchema, req.body);
+    if (!input) throw new AppError('invalid_session', 'Choose a saved demo.');
+    const sessionId = store.switchBrowserSession(req.demoSession, input.sessionId);
     res.cookie('pb_session', store.browserToken(sessionId), { httpOnly: true, sameSite: 'strict', maxAge: 7 * 86400000, path: '/' });
     res.json({ workspace: await snapshot(sessionId) });
   });
