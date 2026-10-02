@@ -22,6 +22,8 @@ The six fictional work items, proposals, conversation messages and confirmed dec
 
 Failed sends keep the message in the composer for an explicit retry. Drafts also survive switching between demos while the page stays open; they are not persisted across a full page reload. New replies follow the conversation when you are at the bottom and leave your position intact while you read older messages.
 
+Start with **Work items**, prepare a question with **Ask about this work**, and send it when ready. Preparing a question makes no model call. Real proposals open **Needs review**; confirmation opens **Decisions**, and cancellation returns to work. When conversation is unavailable, you can still read work, review existing proposals, inspect history, and draft a question. See [workflow-review.md](docs/workflow-review.md) for the interface review and checks.
+
 ## Wornpage interface
 
 The Svelte interface uses the public [Wornpage Components](https://github.com/wornpage/components) packages for buttons, text entry, keyboard tabs, disclosures, alerts, status badges, and before/after change reviews. Both proposals and saved decisions use `ChangePreview`, with a stable denominator of three editable fields: owner, blocker, and next action.
@@ -88,7 +90,7 @@ A locally reviewed `AccessDeniedException` can receive a conservative cost hold 
 
 ## Current verification
 
-The production build and **55 automated tests pass**, including the complete browser confirmation journey, persistence through an actual Node server restart, isolated sessions, malformed MCP calls, protocol negotiation, stale proposals, double clicks, cancellation, owner/blocker changes, keyboard interaction, proposal-status evidence, planning-text handling, and retained-budget enforcement. Automated conversation tests use an explicitly injected model fixture. See [verification.md](docs/verification.md) for the full evidence and limitations.
+The production build and **57 automated tests pass**, including the complete browser confirmation journey, persistence through an actual Node server restart, isolated sessions, malformed MCP calls, protocol negotiation, stale proposals, double clicks, cancellation, owner/blocker changes, keyboard interaction, draft-before-send behavior, review/decision focus, operation-specific progress, proposal-status evidence, planning-text handling, and retained-budget enforcement. Automated conversation tests use an explicitly injected model fixture. See [verification.md](docs/verification.md) for the full evidence and limitations.
 
 On September 30, 2026, the actual Bedrock → MCP → browser journey passed: read a briefing, propose a client-portal next action, confirm exactly the displayed text, refresh, and read the saved action in a subsequent live briefing. A real owner-change proposal was also cancelled without changing the item or revision. This continuation preserves the original denied call and every intervening failed check.
 

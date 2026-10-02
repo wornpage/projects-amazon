@@ -20,10 +20,10 @@ Reviewed October 1, 2026, America/New_York. The app is a local Alexa+ simulation
 | Restart persistence and isolated demo sessions | Actual process-restart tests; live confirmed decision survives subsequent servers | Verified locally; restart also live |
 | Test fixtures only in automated tests; clear provider failures | No production stub switch; unavailable-state tests and retained denied call | Verified locally and live |
 | Initial 20-call batch and explicitly authorized extension to 30, ≤800 output tokens, ≤24 KB input, no SDK retries | Shared persisted ledger across all continuations; 29 attempts | Verified |
-| $1 cap, current prices, retained failures, fail on unreviewed uncertainty | 55-test suite; actual receipts; original denial kept with reviewed $0.03 hold | Verified within retained bound; actual AWS bill unknown |
+| $1 cap, current prices, retained failures, fail on unreviewed uncertainty | 57-test suite; actual receipts; original denial kept with reviewed $0.03 hold | Verified within retained bound; actual AWS bill unknown |
 | Setup, demo script, submission/tool-feedback drafts, MIT source preparation | README, docs, license and public dependency notices | Prepared for review |
 
-The build and **55 automated tests pass**. Automated conversation responses use a fixture; they do not measure model reliability. The suite prevents starting a conversation with only one provider call remaining, because the mandatory fresh read leaves no allowance for a reply.
+The build and **57 automated tests pass**. Automated conversation responses use a fixture; they do not measure model reliability. The suite prevents starting a conversation with only one provider call remaining, because the mandatory fresh read leaves no allowance for a reply.
 
 ## Live evidence and retained failures
 
@@ -108,6 +108,8 @@ The passing report is `data/live-companion-correction-2026-10-01T23-36-48.295Z.j
 Current regional rates were reverified from the official AWS price list: $0.035 per million input tokens and $0.14 per million output tokens. The correction used four calls; the total new validation used ten. Every failed receipt is retained. Browsing saved decisions makes zero inference calls.
 
 ## Challenge delivery
+
+The later [workflow review](workflow-review.md) makes work the first view, adds Needs review alongside Work items and Decisions, prepares questions without sending, and moves keyboard focus when real proposals and human decisions return. It keeps draft entry available while sending is paused. Two additional interaction tests and the expanded unavailable-provider checks bring the passing suite to 57. Saved actual-provider work/history rendered at desktop, narrow desktop and mobile sizes without new inference calls or changes to the ledger. The existing live reports and videos remain historical evidence; no general model reliability or full accessibility-conformance claim is made.
 
 A read-only saved-session capture and approximately 90-second English-captioned review video are retained under `output/review/demo-review/`. Five actual app views cover work, tool traces, the confirmed change, unchanged fields, and connection/budget boundaries. Capture blocked writes and non-loopback requests and verified identical before/after inference-ledger SHA-256 values. The cut uses screenshots, contains no narration audio, and is explicitly a saved-results walkthrough, not a new inference or confirmation run. See [review-handoff.md](review-handoff.md) for review artifacts and remaining external steps.
 

@@ -2,7 +2,7 @@
 
 ## What is ready
 
-Projects Briefing is a standalone local Alexa+ simulation with actual Nova Micro conversation, a three-tool Streamable HTTP MCP server, and browser-only confirmation. The production build and 55 automated tests pass. Retained live evidence demonstrates ordinary-language proposal creation, cancellation, exact confirmation, refresh, an updated briefing, and saved-demo recovery. Tests use fixtures only in automated runs.
+Projects Briefing is a standalone local Alexa+ simulation with actual Nova Micro conversation, a three-tool Streamable HTTP MCP server, and browser-only confirmation. The production build and 57 automated tests pass. The revised interface starts with work, gives proposals a Needs review view, and distinguishes preparing a question from sending it. Retained live evidence demonstrates ordinary-language proposal creation, cancellation, exact confirmation, refresh, an updated briefing, and saved-demo recovery. Tests use fixtures only in automated runs.
 
 The October 1 correction enumerates real item IDs in the MCP schemas after a failed spaced-ID lookup. All failures and receipt history remain retained. General model reliability is still unmeasured. The public Wornpage ChangePreview dependency has a minor singular-count grammar issue recorded in product feedback.
 
@@ -19,6 +19,7 @@ The October 1 correction enumerates real item IDs in the MCP schemas after a fai
 | Submission text | [submission.md](submission.md) | Alexa+ and AWS Builder narrative, integration, evidence and limits |
 | Product feedback | [product-feedback.md](product-feedback.md) | Observed outcomes and concrete recommendations |
 | Verification audit | [verification.md](verification.md) | Local tests, actual-provider evidence and retained failures |
+| Workflow comparison and changes | [workflow-review.md](workflow-review.md) | Work-first navigation, drafting, review, feedback and local accessibility checks |
 | Setup and MIT source | [README.md](../README.md) | Independently runnable repository |
 
 The video is a review artifact assembled from screenshots of the retained actual-model session. It does not reenact proposal creation or confirmation, and should not be described as a continuous fresh run. Its capture allowed only loopback GET/HEAD requests and verified the inference ledger unchanged. No test-model output was used.

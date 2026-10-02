@@ -241,6 +241,7 @@ test('browser: reviewed owner and blocker changes persist and update counts with
       } });
     } finally { await client.close(); }
     await page.reload();
+    await page.getByRole('button', { name: 'Review proposed changes', exact: true }).click();
     const proposal = page.getByTestId('proposal-card');
     await proposal.getByText('2 of 3 fields change.', { exact: true }).waitFor();
     assert.match(await proposal.innerText(), /Alex[\s\S]*Morgan/);
@@ -276,6 +277,7 @@ test('browser: out-of-band confirmed change disables stale confirmation', async 
   const response = await page.request.post(`${runtime.origin}/api/proposals/${second.structuredContent.id}/confirm`, { headers: { Origin: runtime.origin, 'X-Demo-Session': workspace.sessionId }, data: { sourceRevision: 1 } });
   assert.equal(response.status(), 200);
   await client.close(); await page.reload();
+  await page.getByRole('button', { name: 'Review proposed changes', exact: true }).click();
   await page.getByText('The workspace changed. Ask for a fresh proposal before confirming.').waitFor();
   await page.getByTestId('message-evidence').getByText('Needs a fresh proposal', { exact: true }).waitFor();
   assert.equal(await page.getByRole('button', { name: /Confirm action/ }).isDisabled(), true);
@@ -296,6 +298,10 @@ test('browser: mobile layout has no overflow and details support pointer, Enter 
   const decisionsTab = page.getByRole('tab', { name: /^Decisions/ });
   await workTab.focus();
   await workTab.press('ArrowRight');
+  const reviewTab = page.getByRole('tab', { name: /^Needs review/ });
+  assert.equal(await reviewTab.getAttribute('aria-selected'), 'true');
+  assert.equal(await page.getByRole('tabpanel', { name: /^Needs review/ }).isVisible(), true);
+  await reviewTab.press('ArrowRight');
   assert.equal(await decisionsTab.getAttribute('aria-selected'), 'true');
   assert.equal(await decisionsTab.evaluate(element => element === document.activeElement), true);
   assert.equal(await page.getByRole('tabpanel', { name: /^Decisions/ }).isVisible(), true);
@@ -311,11 +317,76 @@ test('browser: unavailable model is explicit and does not fabricate a conversati
   const unavailable = await startServer({ port: 0, databasePath: ':memory:', modelFactory: () => ({ async availability() { return { available: false, message: 'Automated test: credentials unavailable' }; }, converse() { throw new Error('Must not be called'); } }) });
   const context = await browser.newContext(); const page = await context.newPage();
   try {
-    await page.goto(unavailable.origin); await page.getByText('Conversation is unavailable').waitFor();
-    assert.equal(await page.getByLabel('Message your work companion').isDisabled(), true);
+    await page.goto(unavailable.origin); await page.getByText('Conversation is unavailable', { exact: true }).waitFor();
+    const composer = page.getByLabel('Message your work companion');
+    assert.equal(await composer.isDisabled(), false);
+    await page.getByTestId('item-client-portal').getByRole('button', { name: 'Ask about this work', exact: true }).click();
+    assert.match(await composer.inputValue(), /Launch the client portal/);
+    assert.equal(await page.getByRole('button', { name: 'Send message', exact: true }).isDisabled(), true);
+    await composer.press('Enter');
+    await page.getByRole('button', { name: 'Why conversation is unavailable', exact: true }).click();
+    await page.getByText('Automated test: credentials unavailable', { exact: true }).waitFor();
+    await page.getByRole('button', { name: 'View saved decisions', exact: true }).click();
+    await page.getByText('Your decisions will live here.').waitFor();
     assert.equal(await page.locator('.chat-message').count(), 0);
     assert.equal(unavailable.store.budget().attemptedCalls, 0);
   } finally { await context.close(); await unavailable.close(); }
+});
+
+test('browser: work prepares a question without sending, then real proposal review and confirmation move focus', async () => {
+  const { context, page } = await newPage();
+  try {
+    let chatRequests = 0;
+    page.on('request', request => { if (request.url().endsWith('/api/chat')) chatRequests++; });
+    await page.keyboard.press('Tab');
+    assert.equal(await page.getByRole('link', { name: 'Skip to your work', exact: true }).evaluate(element => element === document.activeElement), true);
+    await page.keyboard.press('Enter');
+    assert.equal(await page.locator('#work-title').evaluate(element => element === document.activeElement), true);
+    const order = await page.locator('.main-grid > section').evaluateAll(elements => elements.map(element => element.className));
+    assert.ok(order[0].includes('work-panel'));
+    await page.getByTestId('item-client-portal').getByRole('button', { name: 'Ask about this work', exact: true }).click();
+    const composer = page.getByLabel('Message your work companion');
+    assert.equal(await composer.evaluate(element => element === document.activeElement), true);
+    assert.match(await composer.inputValue(), /What is blocking Launch the client portal/);
+    assert.equal(chatRequests, 0);
+    assert.equal(await page.locator('.chat-message').count(), 0);
+    assert.ok(await composer.evaluate(element => parseFloat(getComputedStyle(element).fontSize) >= 16));
+    await chat(page, 'Propose updating the client portal next action.');
+    const review = page.getByRole('tabpanel', { name: /^Needs review/ });
+    await review.getByRole('button', { name: /Confirm action/ }).waitFor();
+    assert.equal(await page.getByRole('tab', { name: 'Needs review (1)', exact: true }).getAttribute('aria-selected'), 'true');
+    assert.equal(await review.evaluate(element => element === document.activeElement), true);
+    assert.equal(chatRequests, 1);
+    await review.getByRole('button', { name: /Confirm action/ }).click();
+    await page.getByText('Decision saved. The work item now shows your confirmed change.').waitFor();
+    const decisions = page.getByRole('tabpanel', { name: 'Decisions (1)', exact: true });
+    assert.equal(await decisions.isVisible(), true);
+    assert.equal(await decisions.evaluate(element => element === document.activeElement), true);
+    assert.match(await decisions.innerText(), /approved welcome copy tomorrow/);
+    await page.screenshot({ path: resolve(output, 'automated-test-workflow-decision.png'), fullPage: true });
+  } finally { await context.close(); }
+});
+
+test('browser: progress distinguishes a conversation request from saving a human decision', async () => {
+  const { context, page } = await newPage();
+  let releaseChat; let releaseConfirm;
+  try {
+    await page.route('**/api/chat', async route => { await new Promise(resolve => releaseChat = resolve); await route.continue(); });
+    await chat(page, 'Propose updating the client portal next action.');
+    await page.getByText('Reading the work and preparing a reply…', { exact: true }).waitFor();
+    await page.waitForFunction(() => document.querySelector('.thinking'));
+    while (!releaseChat) await new Promise(resolve => setTimeout(resolve, 5));
+    releaseChat();
+    await page.getByRole('button', { name: /Confirm action/ }).waitFor();
+    await page.route('**/api/proposals/*/confirm', async route => { await new Promise(resolve => releaseConfirm = resolve); await route.continue(); });
+    await page.getByRole('button', { name: /Confirm action/ }).click();
+    await page.getByText('Saving your decision…', { exact: true }).waitFor();
+    assert.equal(await page.locator('.thinking').count(), 0);
+    while (!releaseConfirm) await new Promise(resolve => setTimeout(resolve, 5));
+    releaseConfirm();
+    await page.getByText('Decision saved. The work item now shows your confirmed change.').waitFor();
+    assert.equal(await page.locator('.activity-status').count(), 0);
+  } finally { releaseChat?.(); releaseConfirm?.(); await context.close(); }
 });
 
 test('browser: a confirmed decision and conversation survive an actual Node server restart', async () => {

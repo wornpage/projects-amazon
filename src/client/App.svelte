@@ -9,7 +9,8 @@
   import { conversationText } from '../shared/conversation-text.mjs';
   let workspace = $state(null);
   let loading = $state(true);
-  let busy = $state(false);
+  let activity = $state('idle');
+  const busy = $derived(activity !== 'idle');
   let message = $state('');
   let error = $state('');
   let notice = $state('');
@@ -32,10 +33,13 @@
   const pending = $derived(workspace?.proposals.filter(value => value.status === 'pending') ?? []);
   const tabs = $derived([
     { id: 'work', label: `Work items (${workspace?.counts.total ?? 0})` },
+    { id: 'review', label: `Needs review (${pending.length})` },
     { id: 'decisions', label: `Decisions (${workspace?.history.length ?? 0})` }
   ]);
   const workIds = tabDomIds('workspace', 'work');
+  const reviewIds = tabDomIds('workspace', 'review');
   const decisionIds = tabDomIds('workspace', 'decisions');
+  const activityLabel = $derived(activity === 'chat' ? 'Reading the work and preparing a reply…' : activity === 'confirm' ? 'Saving your decision…' : activity === 'cancel' ? 'Cancelling the proposal…' : 'Opening the demo workspace…');
   const prompts = ['What can we move forward today?', 'What is blocking the client portal?', 'Propose asking Jordan for the approved welcome copy tomorrow.'];
   const labels = { owner: 'Owner', blocker: 'Blocker', nextAction: 'Next action' };
   const previewFields = (original, changes) => Object.entries(labels).map(([field, label]) => ({
@@ -70,37 +74,52 @@
   }
   async function send(text = message) {
     if (!text.trim() || busy || !workspace?.model.available) return;
-    busy = true; error = ''; notice = '';
-    try { workspace = (await request('/api/chat', { message: text })).workspace; message = ''; }
+    activity = 'chat'; error = ''; notice = '';
+    try {
+      workspace = (await request('/api/chat', { message: text })).workspace; message = '';
+      if (workspace.proposals.some(value => value.status === 'pending')) await showView('review');
+    }
     catch (failure) { message = text; error = failure.message; await refresh(); }
-    finally { busy = false; }
+    finally { activity = 'idle'; }
   }
   async function decide(proposal, action) {
-    busy = true; error = ''; notice = '';
+    activity = action; error = ''; notice = '';
     try {
       const data = await request(`/api/proposals/${proposal.id}/${action}`, action === 'confirm' ? { sourceRevision: proposal.sourceRevision } : {});
       workspace = data.workspace;
       notice = action === 'confirm' ? 'Decision saved. The work item now shows your confirmed change.' : 'Proposal cancelled. The work item is unchanged.';
+      await showView(action === 'confirm' ? 'decisions' : 'work');
     } catch (failure) { error = failure.message; await refresh(); }
-    finally { busy = false; }
+    finally { activity = 'idle'; }
   }
   async function newWorkspace() {
-    busy = true; error = ''; notice = '';
+    activity = 'workspace'; error = ''; notice = '';
     drafts.set(workspace.sessionId, message);
     try { workspace = (await request('/api/session/new', {})).workspace; message = ''; expanded = null; view = 'work'; notice = 'A fresh demo is ready. Return to earlier work using Saved demos.'; }
     catch (failure) { error = failure.message; await refresh(); message = drafts.get(workspace.sessionId) ?? ''; }
-    finally { busy = false; }
+    finally { activity = 'idle'; }
   }
   async function switchWorkspace(sessionId) {
     if (sessionId === workspace.sessionId || busy) return;
     drafts.set(workspace.sessionId, message);
-    busy = true; error = ''; notice = '';
+    activity = 'workspace'; error = ''; notice = '';
     try {
       workspace = (await request('/api/session/switch', { sessionId })).workspace;
       message = drafts.get(workspace.sessionId) ?? ''; expanded = null; view = 'work';
       notice = 'Saved demo restored, including its work and decisions.';
     } catch (failure) { error = failure.message; await refresh(); message = drafts.get(workspace.sessionId) ?? ''; }
-    finally { busy = false; }
+    finally { activity = 'idle'; }
+  }
+  async function showView(nextView) {
+    view = nextView;
+    await tick();
+    const ids = nextView === 'review' ? reviewIds : nextView === 'decisions' ? decisionIds : workIds;
+    document.getElementById(ids.panelId)?.focus({ preventScroll: true });
+    document.getElementById('work-title')?.scrollIntoView({ block: 'start' });
+  }
+  async function prepareQuestion(text) {
+    message = text; error = ''; notice = 'Question prepared. Send it when you are ready; no request has been sent.';
+    await tick(); document.getElementById('message')?.focus();
   }
   function composerKey(event) {
     if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void send(); }
@@ -111,6 +130,7 @@
 <svelte:head><title>Projects Briefing · A clear next step</title></svelte:head>
 
 <div class="app-shell">
+  <a class="skip-link" href="#work-title">Skip to your work</a>
   <header class="topbar">
     <a href="/" class="brand" aria-label="Projects Briefing home"><span class="brand-mark" aria-hidden="true">p<span>·</span></span><span>Projects <strong>Briefing</strong></span></a>
     <div class="topbar-right"><span class="simulation-badge"><span class="small-dot"></span>Alexa+ simulation</span><IconButton class="refresh-button" label="Refresh workspace" onclick={refresh} disabled={busy || loading}>↻</IconButton></div>
@@ -118,7 +138,7 @@
 
   <main>
     <section class="intro" aria-labelledby="page-title">
-      <div><div class="eyebrow"><span class="eyebrow-rule"></span>THE WORK, IN FOCUS</div><h1 id="page-title">A clear next step.</h1><p>Understand what’s waiting. Decide what moves forward.</p></div>
+      <div><div class="eyebrow"><span class="eyebrow-rule"></span>YOUR WORK, YOUR DECISIONS</div><h1 id="page-title">What can we move forward?</h1><p>Choose work to discuss. Review a proposed change. Keep the decision.</p></div>
       <div class="workspace-label"><span class="workspace-icon" aria-hidden="true">◇</span><div><strong>Studio launch</strong><span>Fictional demo workspace{#if workspace} · revision {workspace.revision}{/if}</span></div></div>
     </section>
 
@@ -127,6 +147,12 @@
 
     {#if loading}<div class="loading" role="status">Opening your demo workspace…</div>
     {:else if workspace}
+      <section class="next-move" aria-labelledby="next-move-title">
+        <div><h2 id="next-move-title">{pending.length ? 'A change needs your review.' : 'Start with the work on your plate.'}</h2><p>{pending.length ? `${pending.length} proposed ${pending.length === 1 ? 'change is' : 'changes are'} waiting. Work stays unchanged until you confirm.` : 'Read an item, then prepare a question for your companion. You decide what gets saved.'}</p></div>
+        <div class="next-move-actions"><Button variant="primary" onclick={() => showView(pending.length ? 'review' : 'work')} disabled={busy}>{pending.length ? 'Review proposed changes' : 'View your work'}</Button><Button onclick={() => showView('decisions')} disabled={busy}>View saved decisions</Button></div>
+      </section>
+      {#if !workspace.model.available}<div class="connection-notice-banner"><Alert tone="warning" title="Conversation is unavailable"><p>You can read work, review existing proposals, and open saved decisions. You can also prepare a question for later.</p><Collapsible summary="Why conversation is unavailable" panelId="availability-reason"><p>{workspace.model.message}</p><p>{workspace.budget.callLimit - workspace.budget.attemptedCalls} / {workspace.budget.callLimit} provider calls remain in this test allowance. A conversation needs at least two.</p><Button class="recheck-button" onclick={refresh} disabled={busy}>Recheck connection</Button></Collapsible></Alert></div>{/if}
+      {#if busy}<p class="activity-status" role="status">{activityLabel}</p>{/if}
       <div class="summary-strip" aria-label="Workspace summary">
         <div><span class="metric-label">Open work</span><strong>{workspace.counts.open}<small> / {workspace.counts.total} items</small></strong></div>
         <div><span class="metric-label"><span class="small-dot amber"></span>Waiting on a blocker</span><strong>{workspace.counts.blocked}<small> / {workspace.counts.open} open</small></strong></div>
@@ -135,12 +161,43 @@
       </div>
 
       <div class="main-grid">
+        <section class="work-panel" aria-labelledby="work-title">
+          <div class="work-heading"><div><span class="section-kicker">STUDIO LAUNCH</span><h2 id="work-title" tabindex="-1">The work on your plate.</h2></div><Button onclick={newWorkspace} disabled={busy}>New demo <span aria-hidden="true">↗</span></Button></div>
+          <div class="demo-picker"><label for="saved-demos">Saved demos</label><select id="saved-demos" value={workspace.sessionId} onchange={async event => { const select = event.currentTarget; await switchWorkspace(select.value); select.value = workspace.sessionId; }} disabled={busy}>{#each workspace.demos as demo}<option value={demo.id}>{demo.label} · revision {demo.revision}</option>{/each}</select><span>Available to this browser.</span></div>
+          <div class="view-tabs"><Tabs id="workspace" label="Workspace views" {tabs} bind:active={view} /></div>
+          <div id={reviewIds.panelId} role="tabpanel" aria-labelledby={reviewIds.tabId} tabindex="-1" hidden={view !== 'review'} class="review-list">
+          {#if pending.length === 0}<div class="empty-history"><h3>No changes waiting for review.</h3><p>Prepare a question about a work item. A real proposal will appear here for your confirmation.</p><Button onclick={() => showView('work')}>View work items</Button></div>{/if}
+          {#each pending as proposed (proposed.id)}
+            <article class="proposal-card" data-testid="proposal-card" aria-labelledby={`proposal-${proposed.id}`}>
+              <div class="proposal-eyebrow"><span aria-hidden="true">✧</span>PROPOSED CHANGE<Badge label="Needs your review" variant="muted" size="sm" /></div><h3 id={`proposal-${proposed.id}`}>{proposed.original.title}</h3>
+              <ChangePreview class="proposal-review" title="Review changes" headingLevel={3} fields={previewFields(proposed.original, proposed.changes)} />
+              {#if proposed.sourceRevision !== workspace.revision}<p class="stale-note" role="status">The workspace changed. Ask for a fresh proposal before confirming.</p>{:else}<p class="proposal-footnote">This changes the next step. It does not mark the work complete.</p>{/if}
+              <div class="proposal-actions"><Button variant="primary" onclick={() => decide(proposed, 'confirm')} disabled={busy || proposed.sourceRevision !== workspace.revision}>Confirm action <span aria-hidden="true">✓</span></Button><Button onclick={() => decide(proposed, 'cancel')} disabled={busy}>Cancel proposal</Button></div>
+            </article>
+          {/each}
+          </div>
+            <div id={workIds.panelId} role="tabpanel" aria-labelledby={workIds.tabId} tabindex="-1" hidden={view !== 'work'} class="work-cards">
+              {#each workspace.items as item (item.id)}
+                <article class="work-card" class:completed={item.status === 'done'} data-testid={`item-${item.id}`}>
+                  <div class="item-top"><span class="item-category">{item.category}</span><Badge label={item.status === 'done' ? 'Done' : item.blocker ? 'Waiting' : 'Ready'} variant={item.status === 'done' ? 'muted' : item.blocker ? 'warn' : 'default'} size="sm" /></div>
+                  <h3>{item.title}</h3><div class="item-owner"><span class="owner-avatar" aria-hidden="true">{item.owner.slice(0, 1)}</span><span>{item.owner}</span></div>
+                  <div class="next-action"><span>NEXT ACTION</span><p>{item.nextAction}</p></div>
+                  <Collapsible summary="Blocker & completion criteria" ariaLabel={`Blocker & completion criteria for ${item.title}`} panelId={`details-${item.id}`} open={expanded === item.id} onchange={open => expanded = open ? item.id : null}><dl class="item-details"><div><dt>Blocker</dt><dd>{item.blocker || 'No blocker recorded.'}</dd></div><div><dt>Completion criteria</dt><dd>{item.completionCriteria}</dd></div></dl></Collapsible>
+                  <Button class="discuss-button" onclick={() => prepareQuestion(`What is blocking ${item.title}, and what next action would move it forward?`)} disabled={busy}>Ask about this work</Button>
+                </article>
+              {/each}
+            </div>
+            <div id={decisionIds.panelId} role="tabpanel" aria-labelledby={decisionIds.tabId} tabindex="-1" hidden={view !== 'decisions'} class="decisions-list">
+              {#if workspace.history.length === 0}<div class="empty-history"><span aria-hidden="true">↳</span><h3>Your decisions will live here.</h3><p>Confirm a proposal to keep a record of what changed and when you confirmed it.</p></div>{/if}
+              {#each workspace.history as decision (decision.id)}<article class="decision-card"><div class="decision-top"><span class="small-dot"></span><strong>Decision saved</strong><time datetime={decision.createdAt}>{time(decision.createdAt)}</time></div><h3>{decision.after.title}</h3><ChangePreview class="decision-review" title="Saved change" headingLevel={3} currentLabel="Before confirmation" proposedLabel="Confirmed" fields={previewFields(decision.before, decision.after)} /><span>Workspace revision {decision.revision}</span></article>{/each}
+            </div>
+        </section>
         <section class="conversation-panel panel" aria-labelledby="conversation-title">
-          <div class="panel-heading"><div><span class="section-kicker">YOUR WORK COMPANION</span><h2 id="conversation-title">Let’s find the next move.</h2></div><span class="companion-symbol" aria-hidden="true">✳</span></div>
+          <div class="panel-heading"><div><span class="section-kicker">YOUR WORK COMPANION</span><h2 id="conversation-title">Ask about your work.</h2><p>The assistant reads and proposes. You confirm changes.</p></div><span class="companion-symbol" aria-hidden="true">✳</span></div>
           <div class="conversation-body" bind:this={conversationBody} onscroll={() => followConversation = conversationBody.scrollHeight - conversationBody.scrollTop - conversationBody.clientHeight < 48} aria-live="polite" aria-busy={busy}>
             {#if workspace.messages.length === 0}
               <div class="welcome-message"><span class="avatar" aria-hidden="true">✳</span><div><strong>Start with the work you have.</strong><p>I can read the board, explain a blocker, and propose a change for you to review. You decide what gets saved.</p></div></div>
-              <div class="starter-questions"><span>TRY ASKING</span>{#each prompts as prompt}<Button class="starter-button" onclick={() => send(prompt)} disabled={busy || !workspace.model.available}>{prompt}<span aria-hidden="true">↗</span></Button>{/each}</div>
+              <div class="starter-questions"><span>PREPARE A QUESTION</span>{#each prompts as prompt}<Button class="starter-button" onclick={() => prepareQuestion(prompt)} disabled={busy}>{prompt}<span aria-hidden="true">↗</span></Button>{/each}</div>
             {:else}
               {#each workspace.messages as entry (entry.id)}
                 {@const evidence = proposalEvidence(entry)}
@@ -154,43 +211,16 @@
                 </article>
               {/each}
             {/if}
-            {#if busy}<div class="thinking" role="status"><span></span><span></span><span></span><p>Working through the request…</p></div>{/if}
+            {#if activity === 'chat'}<div class="thinking" aria-hidden="true"><span></span><span></span><span></span><p>Preparing the reply…</p></div>{/if}
           </div>
-          {#if !workspace.model.available}<div class="connection-notice-banner"><Alert tone="warning" title="Conversation is unavailable"><p>{workspace.model.message}</p>{#if workspace.budget.callLimit - workspace.budget.attemptedCalls < 2}<p>Remaining provider calls in the test allowance: {workspace.budget.callLimit - workspace.budget.attemptedCalls}. A conversation needs at least two.</p>{/if}<Button class="recheck-button" onclick={refresh} disabled={busy}>Recheck connection</Button></Alert></div>{/if}
           <form class="composer" onsubmit={event => { event.preventDefault(); void send(); }}>
-            <label for="message">Message your work companion</label><Textarea id="message" bind:value={message} onkeydown={composerKey} maxlength="1500" rows={2} spellcheck placeholder="What can we move forward today?" disabled={busy || !workspace.model.available} />
-            <div class="composer-bottom"><span>Changes wait for your confirmation.</span><Button variant="primary" type="submit" disabled={busy || !workspace.model.available || !message.trim()} aria-label="Send message">Send <span aria-hidden="true">↑</span></Button></div>
+            <label for="message">Message your work companion</label><Textarea id="message" bind:value={message} onkeydown={composerKey} maxlength="1500" rows={3} spellcheck placeholder="Ask about a blocker or propose a next action…" disabled={busy} />
+            <div class="composer-bottom"><span>{workspace.model.available ? 'Send your question. Review changes before saving.' : 'Question drafts are available. Sending is paused.'}</span><Button variant="primary" type="submit" disabled={busy || !workspace.model.available || !message.trim()} aria-label="Send message">Send <span aria-hidden="true">↑</span></Button></div>
           </form>
           <div class="model-line"><span class="small-dot" class:offline={!workspace.model.available}></span><span>Amazon Bedrock · Nova Micro</span><span>Typed conversation</span></div>
         </section>
 
-        <section class="work-panel" aria-labelledby="work-title">
-          <div class="work-heading"><div><span class="section-kicker">STUDIO LAUNCH</span><h2 id="work-title">The work on your plate.</h2></div><Button onclick={newWorkspace} disabled={busy}>New demo <span aria-hidden="true">↗</span></Button></div>
-          <div class="demo-picker"><label for="saved-demos">Saved demos</label><select id="saved-demos" value={workspace.sessionId} onchange={async event => { const select = event.currentTarget; await switchWorkspace(select.value); select.value = workspace.sessionId; }} disabled={busy}>{#each workspace.demos as demo}<option value={demo.id}>{demo.label} · revision {demo.revision}</option>{/each}</select><span>Available to this browser.</span></div>
-          <div class="view-tabs"><Tabs id="workspace" label="Workspace views" {tabs} bind:active={view} /></div>
-          {#each pending as proposed (proposed.id)}
-            <article class="proposal-card" data-testid="proposal-card" aria-labelledby={`proposal-${proposed.id}`}>
-              <div class="proposal-eyebrow"><span aria-hidden="true">✧</span>PROPOSED CHANGE<Badge label="Needs your review" variant="muted" size="sm" /></div><h3 id={`proposal-${proposed.id}`}>{proposed.original.title}</h3>
-              <ChangePreview class="proposal-review" title="Review changes" headingLevel={3} fields={previewFields(proposed.original, proposed.changes)} />
-              {#if proposed.sourceRevision !== workspace.revision}<p class="stale-note" role="status">The workspace changed. Ask for a fresh proposal before confirming.</p>{:else}<p class="proposal-footnote">This changes the next step. It does not mark the work complete.</p>{/if}
-              <div class="proposal-actions"><Button variant="primary" onclick={() => decide(proposed, 'confirm')} disabled={busy || proposed.sourceRevision !== workspace.revision}>Confirm action <span aria-hidden="true">✓</span></Button><Button onclick={() => decide(proposed, 'cancel')} disabled={busy}>Cancel proposal</Button></div>
-            </article>
-          {/each}
-            <div id={workIds.panelId} role="tabpanel" aria-labelledby={workIds.tabId} hidden={view !== 'work'} class="work-cards">
-              {#each workspace.items as item (item.id)}
-                <article class="work-card" class:completed={item.status === 'done'} data-testid={`item-${item.id}`}>
-                  <div class="item-top"><span class="item-category">{item.category}</span><Badge label={item.status === 'done' ? 'Done' : item.blocker ? 'Waiting' : 'Ready'} variant={item.status === 'done' ? 'muted' : item.blocker ? 'warn' : 'default'} size="sm" /></div>
-                  <h3>{item.title}</h3><div class="item-owner"><span class="owner-avatar" aria-hidden="true">{item.owner.slice(0, 1)}</span><span>{item.owner}</span></div>
-                  <div class="next-action"><span>NEXT ACTION</span><p>{item.nextAction}</p></div>
-                  <Collapsible summary="Blocker & completion criteria" ariaLabel={`Blocker & completion criteria for ${item.title}`} panelId={`details-${item.id}`} open={expanded === item.id} onchange={open => expanded = open ? item.id : null}><dl class="item-details"><div><dt>Blocker</dt><dd>{item.blocker || 'No blocker recorded.'}</dd></div><div><dt>Completion criteria</dt><dd>{item.completionCriteria}</dd></div></dl></Collapsible>
-                </article>
-              {/each}
-            </div>
-            <div id={decisionIds.panelId} role="tabpanel" aria-labelledby={decisionIds.tabId} hidden={view !== 'decisions'} class="decisions-list">
-              {#if workspace.history.length === 0}<div class="empty-history"><span aria-hidden="true">↳</span><h3>Your decisions will live here.</h3><p>Confirm a proposal to keep a record of what changed and when you confirmed it.</p></div>{/if}
-              {#each workspace.history as decision (decision.id)}<article class="decision-card"><div class="decision-top"><span class="small-dot"></span><strong>Decision saved</strong><time datetime={decision.createdAt}>{time(decision.createdAt)}</time></div><h3>{decision.after.title}</h3><ChangePreview class="decision-review" title="Saved change" headingLevel={3} currentLabel="Before confirmation" proposedLabel="Confirmed" fields={previewFields(decision.before, decision.after)} /><span>Workspace revision {decision.revision}</span></article>{/each}
-            </div>
-        </section>
+
       </div>
 
       <div class="demo-details"><Collapsible summary="Demo & connection details" panelId="connection-details"><section class="connection-details"><div><h3>A working simulation</h3><p>Six fictional items, an independent SQLite workspace, and a real Streamable HTTP MCP server. This app is not connected to Alexa+ or production Projects.</p></div><div><h3>Bounded live inference</h3><p>{workspace.budget.attemptedCalls} / {workspace.budget.callLimit} calls attempted. Estimated completed-call cost: ${workspace.budget.estimatedCostUsd.toFixed(6)}. Reserved cost: ${workspace.budget.reservedUsd.toFixed(6)}. Authorization: $1 total. {workspace.budget.uncertainCalls} attempts have uncertain usage: {workspace.budget.reviewedUncertainCalls} covered by reviewed conservative holds; {workspace.budget.unreviewedUncertainCalls} awaiting review. These holds do not establish actual billed usage.</p></div><div><h3>MCP connection</h3><p>Protocol 2025-11-25 · <code>/mcp</code> · run <code>npm run mcp:session</code> for an isolated client workspace. Model tools can read and propose; confirmation is a browser action.</p></div></section></Collapsible></div>
