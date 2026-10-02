@@ -115,7 +115,7 @@
     await tick();
     const ids = nextView === 'review' ? reviewIds : nextView === 'decisions' ? decisionIds : workIds;
     document.getElementById(ids.panelId)?.focus({ preventScroll: true });
-    document.getElementById('work-title')?.scrollIntoView({ block: 'start' });
+    document.getElementById('work-title')?.closest('.work-heading')?.scrollIntoView({ block: 'start' });
   }
   async function prepareQuestion(text) {
     message = text; error = ''; notice = 'Question prepared. Send it when you are ready; no request has been sent.';
