@@ -4,12 +4,15 @@ A conversational work companion: read the work, understand the blocker, propose 
 
 This is an **Alexa+ web simulation**, with an independently authored demo workspace and a real MCP server. It does not connect to Alexa+ partner-preview tools, production Projects, or the Nebius edition.
 
+![Projects Briefing showing fictional work, review navigation, and a saved conversation](docs/images/workspace.png)
+
 ## Run locally
 
 Requires Node.js 24 and npm. The app binds to the local loopback interface.
 
 ```powershell
-cd C:\jkbSoft\projects-amazon
+git clone https://github.com/wornpage/projects-amazon.git
+cd projects-amazon
 npm ci
 npx playwright install chromium
 npm run build
@@ -103,6 +106,8 @@ The current checkpoint is **29/30 attempts**, with **$0.001918455** in token-cos
 The operator-only `store.extendInferenceAllowance(callLimit, reason)` records an explicit authorization in SQLite, preserving all receipts and the $1 cap. It accepts only a higher ceiling up to 30, requires a retained reason, and is unavailable through HTTP or MCP. Existing databases without an authorization retain the initial 20-call ceiling. The October 1 extension is already recorded; do not repeat it or delete the ledger.
 
 ## Challenge materials
+
+Source: [wornpage/projects-amazon](https://github.com/wornpage/projects-amazon). The app runs locally; no hosted service is required to inspect or test it. Configure your own dedicated AWS profile to run conversation. A fresh checkout starts with its own empty demo database and initial 20-call/$1 inference ceiling; it does not contain the author's saved sessions or credentials.
 
 The local captioned review video and the complete owner review checklist are described in [review-handoff.md](docs/review-handoff.md). Video preparation used the saved actual Bedrock session and made zero inference calls.
 
