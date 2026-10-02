@@ -10,6 +10,7 @@
 | License | GitHub detects MIT |
 | Fresh checkout | Installation, build, and 57 local tests passed |
 | Demo video | https://youtu.be/XkcJ2Nk2Yew — YouTube confirmed Video published with Public selected |
+| Captions | Selectable English subtitle track published in YouTube Studio |
 | Video content | 80-second English-captioned walkthrough of retained actual Bedrock results; no narration audio or fresh model call; earlier interface captured |
 | Devpost | Registration and final submission pending |
 | Inference | No calls made for publication; retained ledger remains 29/30 with $1 cap |
