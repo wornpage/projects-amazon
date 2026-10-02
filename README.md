@@ -109,6 +109,8 @@ The operator-only `store.extendInferenceAllowance(callLimit, reason)` records an
 
 Source: [wornpage/projects-amazon](https://github.com/wornpage/projects-amazon). The app runs locally; no hosted service is required to inspect or test it. Configure your own dedicated AWS profile to run conversation. A fresh checkout starts with its own empty demo database and initial 20-call/$1 inference ceiling; it does not contain the author's saved sessions or credentials.
 
+[Watch the public demo](https://youtu.be/XkcJ2Nk2Yew) · [Download release 0.1.0](https://github.com/wornpage/projects-amazon/releases/tag/v0.1.0). The video is an 80-second English-captioned walkthrough of saved actual Bedrock results, with no narration audio or fresh inference. It shows the earlier interface; the repository includes the later work/review navigation improvements.
+
 The local captioned review video and the complete owner review checklist are described in [review-handoff.md](docs/review-handoff.md). Video preparation used the saved actual Bedrock session and made zero inference calls.
 
 See [demo-script.md](docs/demo-script.md), [submission.md](docs/submission.md) and [product-feedback.md](docs/product-feedback.md). The challenge deadline is **October 23, 2026, 3 p.m. America/New_York**. A locally runnable repository and demonstration video are accepted for Alexa+; public hosting is not required. Prepare a video under three minutes and complete the required product feedback. Publishing the repository and submitting the entry are separate review steps.

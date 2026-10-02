@@ -45,7 +45,8 @@ The standalone app, Bedrock conversation, MCP tools, confirmation boundary, loca
 ## Links and materials
 
 - GitHub source: https://github.com/wornpage/projects-amazon
-- Public YouTube/Vimeo demonstration URL: pending upload.
+- Public demonstration: https://youtu.be/XkcJ2Nk2Yew
+- Source release: https://github.com/wornpage/projects-amazon/releases/tag/v0.1.0
 - Full product feedback: [product-feedback.md](product-feedback.md).
 - Setup and reproduction: [README.md](../README.md).
 

@@ -6,6 +6,10 @@
 
 **Mini challenge:** AWS Builder
 
+**Source:** https://github.com/wornpage/projects-amazon
+
+**Public demo:** https://youtu.be/XkcJ2Nk2Yew — 80 seconds, English captions, saved actual Bedrock results. The later interface refinement is included in the source.
+
 Projects Briefing helps a small team move from “what is blocked?” to a reviewed next action. In a conversational web interface, the assistant reads work items, explains their owners and blockers, and prepares a precise change. The person reviews a before/after card and confirms or cancels. Confirmed decisions persist, appear in history, and shape the next briefing.
 
 The app is an explicitly labeled Alexa+ simulation. Its independent Node.js server exposes a working Streamable HTTP MCP endpoint using specification 2025-11-25. It implements Amazon Nova Micro through Amazon Bedrock Converse and executes the model's tool requests through an MCP client. The model can read and propose. Human confirmation uses a separate browser credential and checks the proposal's source revision. The interface uses the public MIT-licensed Wornpage component library.
@@ -20,4 +24,4 @@ This application was independently created during the challenge window. It uses 
 
 The interface renders proposal replies from actual tool results, shows current proposal status in chat, includes pending proposals in fresh briefings, and hides planning sections. These changes pass local regressions and were exercised in the October 1 live workflow. The support case was closed at the owner's request after successful runtime access was demonstrated.
 
-**Before submitting:** insert the reviewed GitHub repository URL and a public English demo video under three minutes. Review the observed limitations and include the product feedback. A fresh recording needs a separately authorized inference allowance: the current batch has only one call left. Repository publication, reviewer access and Devpost submission have not been performed.
+**Before submitting:** complete Devpost registration and the final entry, including product feedback and the selected Alexa+/AWS Builder tracks. The GitHub repository and YouTube demo are public; Devpost submission is still pending. A fresh model recording would need a separately authorized inference allowance because the current batch has only one call left.
