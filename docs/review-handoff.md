@@ -2,7 +2,7 @@
 
 ## What is ready
 
-Published October 2, 2026: [public GitHub source](https://github.com/wornpage/projects-amazon), [release 0.1.0](https://github.com/wornpage/projects-amazon/releases/tag/v0.1.0), and [public YouTube demo](https://youtu.be/XkcJ2Nk2Yew). The release source ZIP was verified against its uploaded SHA-256 digest. A fresh checkout installed, built, and passed 57 tests. Devpost registration and final submission remain pending.
+Published October 2, 2026: [public GitHub source](https://github.com/wornpage/projects-amazon), [release 0.1.0](https://github.com/wornpage/projects-amazon/releases/tag/v0.1.0), and [public YouTube demo](https://youtu.be/XkcJ2Nk2Yew). The release source ZIP was verified against its uploaded SHA-256 digest. A fresh checkout installed, built, and passed 57 tests. The owner submitted the [Devpost entry](https://devpost.com/software/projects-briefing); the challenge's My projects page confirmed Submitted.
 
 Projects Briefing is a standalone local Alexa+ simulation with actual Nova Micro conversation, a three-tool Streamable HTTP MCP server, and browser-only confirmation. The production build and 57 automated tests pass. The revised interface starts with work, gives proposals a Needs review view, and distinguishes preparing a question from sending it. Retained live evidence demonstrates ordinary-language proposal creation, cancellation, exact confirmation, refresh, an updated briefing, and saved-demo recovery. Tests use fixtures only in automated runs.
 
@@ -30,7 +30,7 @@ The video is a review artifact assembled from screenshots of the retained actual
 
 Review the app, submission text, feedback and video. Select the captioned saved-results cut or a fresh narrated recording for the public demonstration. A fresh recording needs a new explicit allowance; this app's operator extension currently cannot exceed 30 calls. No additional inference was performed to prepare this handoff.
 
-The independently authored MIT source and captioned saved-results video are now public, and their URLs are in [submission-fields.md](submission-fields.md). Complete the personal registration fields and official-rule agreement, then the Devpost entry. Core Projects and Nebius are outside this handoff.
+The independently authored MIT source and captioned saved-results video are public, and their URLs are in [submission-fields.md](submission-fields.md). The owner completed registration, entrant declarations, and the final Devpost submission. This confirms submission, not a judging outcome. Core Projects and Nebius are outside this handoff.
 
 ## Budget and privacy
 

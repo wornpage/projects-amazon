@@ -12,7 +12,7 @@
 | Demo video | https://youtu.be/XkcJ2Nk2Yew — YouTube confirmed Video published with Public selected |
 | Captions | Selectable English subtitle track published in YouTube Studio |
 | Video content | 80-second English-captioned walkthrough of retained actual Bedrock results; no narration audio or fresh model call; earlier interface captured |
-| Devpost | Registered; all entry details and thumbnail saved. Final review shows 4/5 steps complete. Final Official Rules/Terms agreement and submission pending |
+| Devpost | Submitted by the owner; the challenge's My projects page confirmed Submitted on October 2, 2026. Project: https://devpost.com/software/projects-briefing |
 | Inference | No calls made for publication; retained ledger remains 29/30 with $1 cap |
 
 The release snapshot is immutable. Later commits may update publication links and entry status without changing that release's code or tag. Publication is distinct from acceptance into the hackathon and from judging outcomes.
