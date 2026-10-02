@@ -36,6 +36,18 @@ This feedback reflects local development and 29 retained Bedrock attempts under 
 
 **Validation assumptions:** a correct live next-action proposal omitted one terminal period. The harness now checks intended wording and separately asserts that confirmation stores the exact displayed text, rather than treating prompt punctuation as evidence of a storage defect. The failed check is retained.
 
+## Structured friction log
+
+Severity below describes the effect on this prototype, not a measured service-wide failure rate.
+
+| Task and steps | Expected result | Observed result | Severity | Workaround used | Actionable suggestion |
+|---|---|---|---|---|---|
+| Invoke Nova Micro after checking model availability and account/quota metadata | Metadata would help establish usable runtime access | An initial invocation was denied despite favorable metadata; the original receipt omitted the full explanation | High: blocked initial runtime validation | Retained the failure, used bounded diagnostics and temporary credentials, and later demonstrated a successful invocation. The original denial cause remains unknown | Distinguish availability metadata from invocation authorization and return request-specific remediation; examples should retain bounded error details |
+| Refresh temporary credentials from the dedicated AWS profile | The SDK would refresh credentials for the next Converse request | Refresh failed when the profile lacked a region | High: blocked a provider call | Persisted us-east-1 in the dedicated profile; subsequent refresh and Converse diagnostic succeeded | Show required profile fields and the waiting sign-in prompt clearly in CLI/SDK onboarding |
+| Ask in ordinary language for an owner-change proposal | A saved proposal tool result would produce a reviewable card | Two earlier requests described a proposal in prose without calling the proposal tool | High: prevented the requested review action | An explicit correction naming propose_next_action created a card. The app derives proposal replies and confirmation authority from saved records; broader reliability remains unproven | Provide multi-turn tool-use examples that verify tool results before claiming an action is ready |
+| Inspect the client portal item during an ordinary-language change request | get_work_item would receive the exact client-portal ID | The model twice supplied client portal with a space, and lookup failed | Medium: interrupted the workflow | Enumerated exact workspace IDs in both item-tool schemas; the repeated request passed proposal, confirmation, refresh, and updated briefing | Recommend schema-constrained IDs for finite workspaces and stop repeated identical failed lookups |
+| Count input tokens before a bounded Nova Micro request | A preflight count would support an exact cost reservation | The model rejected CountTokens as unsupported | Medium: required a conservative budgeting method | Reserved a documented context-bound amount and retained uncertain usage instead of assuming zero cost | List model-specific CountTokens support beside model cards and document a conservative reservation alternative |
+
 ## Feature requests
 
 - Provide a self-service Alexa+ MCP testing path outside gated preview access, with a stateful decision example and separate human confirmation.
