@@ -11,9 +11,10 @@ The October 1 correction enumerates real item IDs in the MCP schemas after a fai
 | Material | Location | Review purpose |
 |---|---|---|
 | Local app | `http://127.0.0.1:4317` | Inspect fictional work and saved history |
-| Captioned video cut | `output/review/demo-review/projects-briefing-review.mp4` | Approximately 90 seconds of actual saved live results; no audio or fresh invocation |
-| Video captions | `output/review/demo-review/captions.srt` | English script and timing |
-| Capture receipt | `output/review/demo-review/capture-receipt.json` | Screenshot hashes and unchanged inference-ledger digest |
+| Current captioned video | `output/review/demo-readable-v3/projects-briefing-readable.mp4` | 80 seconds, 1080p, four close views with large text; saved live results, no audio or fresh invocation |
+| Video captions | `output/review/demo-readable-v3/captions.srt` | English script and timing |
+| Capture and video receipts | `output/review/demo-readable-v3/capture-receipt.json` and `video-receipt.json` | Screenshot/video hashes, actual source-report link, measured text sizes and unchanged inference ledger |
+| Preserved original video | `output/review/demo-review/projects-briefing-review.mp4` | Earlier 90-second overview; retained for comparison |
 | Fresh interactive demo script | [demo-script.md](demo-script.md) | Target 2:40; requires a new inference allowance before recording |
 | Submission text | [submission.md](submission.md) | Alexa+ and AWS Builder narrative, integration, evidence and limits |
 | Product feedback | [product-feedback.md](product-feedback.md) | Observed outcomes and concrete recommendations |
